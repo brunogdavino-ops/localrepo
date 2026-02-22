@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "309238860637",
+    "project_id": "auditapp-94b97",
+    "storage_bucket": "auditapp-94b97.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309238860637:android:f5fc1fab0d8a59bfedb6b4",
+        "android_client_info": {
+          "package_name": "com.example.audit_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5dvmJiKpE0kY6_X_vCIPnvxBnvypEFDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309238860637:android:db612d4eea1e3a04edb6b4",
+        "android_client_info": {
+          "package_name": "com.mzmz.appaudit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5dvmJiKpE0kY6_X_vCIPnvxBnvypEFDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
