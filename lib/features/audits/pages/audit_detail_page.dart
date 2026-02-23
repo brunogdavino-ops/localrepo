@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/audit_model.dart';
+import 'audit_fill_page.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/status_badge.dart';
 
@@ -16,6 +17,7 @@ class AuditDetailPage extends StatefulWidget {
 
 class _AuditDetailPageState extends State<AuditDetailPage> {
   late final Future<_AuditDetailData> _detailFuture;
+  String? _loadedAuditStatus;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     }
 
     final audit = AuditModel.fromDocument(auditDoc);
+    _loadedAuditStatus = audit.status;
     final answersSnapshot = await auditDoc.reference.collection('answers').get();
 
     final clientRef = audit.clientRef;
@@ -107,6 +110,26 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       groups: groups,
       totalItems: totalItems,
       completedItems: completedItems,
+    );
+  }
+
+  bool _canContinueEditing(String? status) {
+    return status == 'draft' || status == 'in_progress';
+  }
+
+  void _handleContinueEditing([String? status]) {
+    final currentStatus = status ?? _loadedAuditStatus;
+    if (!_canContinueEditing(currentStatus)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Auditoria em validacao')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AuditFillPage(auditId: widget.auditId),
+      ),
     );
   }
 
@@ -295,6 +318,17 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
             ),
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: () => _handleContinueEditing(_loadedAuditStatus),
+            icon: Icon(
+              Icons.edit_outlined,
+              color: _canContinueEditing(_loadedAuditStatus)
+                  ? const Color(0xFF39306E)
+                  : const Color(0xFF8A8FA3),
+            ),
+          ),
+        ],
       ),
       body: FutureBuilder<_AuditDetailData>(
         future: _detailFuture,

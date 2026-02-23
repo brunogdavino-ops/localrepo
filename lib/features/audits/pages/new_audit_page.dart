@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -171,6 +171,7 @@ class _NewAuditPageState extends State<NewAuditPage> {
       initialDate: _chosenDate,
       firstDate: DateTime.now().subtract(const Duration(days: 3650)),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
+      locale: const Locale('pt', 'BR'),
     );
 
     if (picked == null) return;
@@ -265,34 +266,46 @@ class _NewAuditPageState extends State<NewAuditPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE6E6EF)),
-                    ),
-                    child: Text(
-                      'Artezi',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF39306E),
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Color(0xFFE6E6EF),
+                    width: 1,
+                  ),
+                ),
+              ),
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 4),
+              child: SizedBox(
+                height: 40,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: const EdgeInsets.only(left: 6, right: 8),
+                        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF39306E)),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Color(0xFF39306E)),
-                  ),
-                ],
+                    Align(
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        'assets/logo-escura.png',
+                        height: 30,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(width: 48, height: 48),
+                    ),
+                  ],
+                ),
               ),
             ),
+            const SizedBox(height: 16),
             Padding(
               padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 12),
               child: Align(
@@ -357,40 +370,106 @@ class _NewAuditPageState extends State<NewAuditPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
-                          controller: _clientSearchController,
-                          focusNode: _clientFocusNode,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: const Color(0xFF1C1C1C),
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Buscar cliente...',
-                            hintStyle: TextStyle(
-                              color: const Color(0xFF8A8FA3),
+                        if (_selectedClientRef == null) ...[
+                          TextField(
+                            controller: _clientSearchController,
+                            focusNode: _clientFocusNode,
+                            style: TextStyle(
                               fontSize: 14,
+                              color: const Color(0xFF1C1C1C),
                             ),
-                            prefixIcon: const Icon(Icons.search, color: Color(0xFF8A8FA3)),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 14,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: Color(0xFFE6E6EF)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF6D4BC3),
-                                width: 1.5,
+                            decoration: InputDecoration(
+                              hintText: 'Buscar cliente...',
+                              hintStyle: TextStyle(
+                                color: const Color(0xFF8A8FA3),
+                                fontSize: 14,
+                              ),
+                              prefixIcon: const Icon(Icons.search, color: Color(0xFF8A8FA3)),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(color: Color(0xFFE6E6EF)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF6D4BC3),
+                                  width: 1.5,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        if (_clientResults.isNotEmpty) ...[
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE6E6EF)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Cliente',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: const Color(0xFF8A8FA3),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _selectedClientName ?? 'Cliente sem nome',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: const Color(0xFF1C1C1C),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedClientRef = null;
+                                      _selectedClientName = null;
+                                      _clientSearchController.clear();
+                                      _clientResults = const [];
+                                    });
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    'Trocar',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF5A3E8E),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (_selectedClientRef == null && _clientResults.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Container(
                             constraints: const BoxConstraints(maxHeight: 280),
@@ -445,6 +524,7 @@ class _NewAuditPageState extends State<NewAuditPage> {
                 padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 16),
                 child: Column(
                   children: [
+                    const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -469,7 +549,7 @@ class _NewAuditPageState extends State<NewAuditPage> {
                                       ),
                                     )
                                   : Text(
-                                      'Comecar auditoria',
+                                      'Criar auditoria',
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
@@ -478,39 +558,6 @@ class _NewAuditPageState extends State<NewAuditPage> {
                                             : const Color(0xFF9A9AB0),
                                       ),
                                     ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: canSubmit ? const Color(0xFF6D4BC3) : const Color(0xFFDCDCE6),
-                          ),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: canSubmit ? () => _handleCreate(draft: true) : null,
-                            child: Center(
-                              child: Text(
-                                'Salvar como rascunho',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: canSubmit
-                                      ? const Color(0xFF5A3E8E)
-                                      : const Color(0xFF9A9AB0),
-                                ),
-                              ),
                             ),
                           ),
                         ),

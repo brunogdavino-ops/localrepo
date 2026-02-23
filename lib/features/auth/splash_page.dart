@@ -69,7 +69,7 @@ class _SplashPageState extends State<SplashPage> {
           const Center(
             child: Image(
               image: AssetImage('assets/logo-artezi.png'),
-              width: 200,
+              width: 220,
               fit: BoxFit.contain,
             ),
           ),
