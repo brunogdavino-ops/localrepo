@@ -6,7 +6,6 @@ import 'models/audit_model.dart';
 import 'pages/audit_detail_page.dart';
 import 'pages/new_audit_page.dart';
 import 'services/audit_service.dart';
-import 'widgets/status_badge.dart';
 
 class AuditsPage extends StatefulWidget {
   const AuditsPage({Key? key}) : super(key: key);
@@ -78,19 +77,43 @@ class _AuditsPageState extends State<AuditsPage> {
     return '$day/$month/$year';
   }
 
-  StatusBadgeType _badgeType(String status) {
-    final normalized = status.toLowerCase();
-    if (normalized == 'completed' || normalized == 'concluida') {
-      return StatusBadgeType.completed;
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'in_progress':
+        return 'Em andamento';
+      case 'validation_pending':
+        return 'Em Validação';
+      case 'completed':
+        return 'Concluída';
+      default:
+        return status;
     }
-    return StatusBadgeType.started;
   }
 
-  String _statusLabel(String status) {
-    final normalized = status.toLowerCase();
-    if (normalized == 'completed') return 'Concluida';
-    if (normalized == 'started') return 'Pendente';
-    return status;
+  Color _statusBackgroundColor(String status) {
+    switch (status) {
+      case 'completed':
+        return Colors.green.withValues(alpha: 0.12);
+      case 'validation_pending':
+        return const Color(0xFF3B82F6).withValues(alpha: 0.12);
+      case 'in_progress':
+        return Colors.amber.withValues(alpha: 0.15);
+      default:
+        return Colors.amber.withValues(alpha: 0.15);
+    }
+  }
+
+  Color _statusTextColor(String status) {
+    switch (status) {
+      case 'completed':
+        return Colors.green;
+      case 'validation_pending':
+        return const Color(0xFF3B82F6);
+      case 'in_progress':
+        return Colors.amber[800]!;
+      default:
+        return Colors.amber[800]!;
+    }
   }
 
   Widget _buildAuditCard(BuildContext context, AuditModel audit) {
@@ -158,7 +181,7 @@ class _AuditsPageState extends State<AuditsPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '${audit.formattedCode} - ${_formatDate(audit.startedAt)} - ${info.templateName}',
+                            '${audit.formattedCode} - ${_formatDate(audit.startedAt)}',
                             style: TextStyle(
                               fontSize: 13,
                               color: const Color(0xFF8A8FA3),
@@ -167,9 +190,20 @@ class _AuditsPageState extends State<AuditsPage> {
                         ],
                       ),
                     ),
-                    StatusBadge(
-                      label: _statusLabel(audit.status),
-                      type: _badgeType(audit.status),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _statusBackgroundColor(audit.status),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _statusLabel(audit.status),
+                        style: TextStyle(
+                          color: _statusTextColor(audit.status),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ],
                 ),

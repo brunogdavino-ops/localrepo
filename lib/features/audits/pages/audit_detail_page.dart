@@ -36,6 +36,21 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     final audit = AuditModel.fromDocument(auditDoc);
     _loadedAuditStatus = audit.status;
     final answersSnapshot = await auditDoc.reference.collection('answers').get();
+    final questionsSnapshot = await firestore
+        .collection('questions')
+        .where('templateRef', isEqualTo: audit.templateRef)
+        .get();
+    final questions = questionsSnapshot.docs;
+    final answers = answersSnapshot.docs.map((doc) => doc.data()).toList(growable: false);
+    int compliantCount = 0;
+    int nonCompliantCount = 0;
+    for (final answer in answers) {
+      final response = answer['response'];
+      if (response == 'compliant') compliantCount++;
+      if (response == 'non_compliant') nonCompliantCount++;
+    }
+    final int evaluatedCount = compliantCount + nonCompliantCount;
+    final double overallScore = _calculateWeightedScore(answers, questionsSnapshot.docs);
 
     final clientRef = audit.clientRef;
     String clientName = 'Cliente sem nome';
@@ -69,6 +84,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       final builder = grouped.putIfAbsent(
         categoryId,
         () => _CategoryGroupBuilder(
+          categoryRefPath: categorySnapshot.reference.path,
           categoryName: (categoryData['name'] as String?) ?? 'Sem categoria',
           categoryOrder: (categoryData['order'] as num?)?.toInt() ?? 999999,
         ),
@@ -87,8 +103,14 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     final groups = grouped.values.map((builder) {
       builder.items.sort((a, b) => a.questionOrder.compareTo(b.questionOrder));
       return _CategoryGroup(
+        categoryRefPath: builder.categoryRefPath,
         categoryName: builder.categoryName,
         categoryOrder: builder.categoryOrder,
+        categoryScore: _calculateCategoryWeightedScore(
+          builder.categoryRefPath,
+          questions,
+          answers,
+        ),
         items: builder.items,
       );
     }).toList();
@@ -106,6 +128,10 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       formattedCode: audit.formattedCode,
       status: audit.status,
       score: audit.score,
+      compliantCount: compliantCount,
+      nonCompliantCount: nonCompliantCount,
+      evaluatedCount: evaluatedCount,
+      overallScore: overallScore,
       startedAt: audit.startedAt,
       groups: groups,
       totalItems: totalItems,
@@ -113,8 +139,103 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     );
   }
 
+  double _calculateWeightedScore(
+    List answers,
+    List questions,
+  ) {
+    double totalEvaluatedWeight = 0;
+    double totalCompliantWeight = 0;
+
+    for (final answer in answers) {
+      final response = answer['response'];
+      if (response != 'compliant' && response != 'non_compliant') continue;
+
+      final answerQuestionRef = answer['questionRef'] as DocumentReference?;
+      QueryDocumentSnapshot<Map<String, dynamic>>? question;
+      for (final q in questions) {
+        final questionDoc = q as QueryDocumentSnapshot<Map<String, dynamic>>;
+        if (questionDoc.reference.path == answerQuestionRef?.path) {
+          question = questionDoc;
+          break;
+        }
+      }
+
+      final weightValue = question?.data()['weight'];
+      final weight = weightValue is num ? weightValue.toDouble() : 1.0;
+
+      totalEvaluatedWeight += weight;
+
+      if (response == 'compliant') {
+        totalCompliantWeight += weight;
+      }
+    }
+
+    if (totalEvaluatedWeight == 0) return 0.0;
+
+    final score = (totalCompliantWeight / totalEvaluatedWeight) * 100;
+    return double.parse(score.toStringAsFixed(1));
+  }
+
+  double _calculateCategoryWeightedScore(
+    String categoryRef,
+    List questions,
+    List answers,
+  ) {
+    double totalEvaluatedWeight = 0;
+    double totalCompliantWeight = 0;
+
+    for (final questionDoc in questions) {
+      final question = questionDoc as QueryDocumentSnapshot<Map<String, dynamic>>;
+      final questionData = question.data();
+      final questionCategoryRef = questionData['categoryRef'] as DocumentReference?;
+      if (questionCategoryRef?.path != categoryRef) continue;
+
+      Map<String, dynamic>? answer;
+      for (final a in answers) {
+        final answerData = a as Map<String, dynamic>;
+        final answerQuestionRef = answerData['questionRef'] as DocumentReference?;
+        if (answerQuestionRef?.path == question.reference.path) {
+          answer = answerData;
+          break;
+        }
+      }
+
+      if (answer == null) continue;
+
+      final response = answer['response'];
+      if (response != 'compliant' && response != 'non_compliant') continue;
+
+      final weightValue = questionData['weight'];
+      final weight = weightValue is num ? weightValue.toDouble() : 1.0;
+
+      totalEvaluatedWeight += weight;
+
+      if (response == 'compliant') {
+        totalCompliantWeight += weight;
+      }
+    }
+
+    if (totalEvaluatedWeight == 0) return 0.0;
+
+    final score = (totalCompliantWeight / totalEvaluatedWeight) * 100;
+    return double.parse(score.toStringAsFixed(1));
+  }
+
   bool _canContinueEditing(String? status) {
     return status == 'draft' || status == 'in_progress';
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'in_progress':
+        return 'Em andamento';
+      case 'validation_pending':
+        return 'Em Validação';
+      case 'completed':
+        return 'Concluída';
+      default:
+        return status;
+    }
   }
 
   void _handleContinueEditing([String? status]) {
@@ -130,6 +251,12 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       MaterialPageRoute(
         builder: (_) => AuditFillPage(auditId: widget.auditId),
       ),
+    );
+  }
+
+  void _handleGeneratePdf() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Geracao de PDF sera habilitada nesta tela.')),
     );
   }
 
@@ -224,34 +351,47 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(vertical: 8),
           childrenPadding: const EdgeInsets.only(bottom: 10),
-          title: Row(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      group.categoryName,
-                      style: TextStyle(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      group.categoryName.toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF39306E),
+                        color: Color(0xFF39306E),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$filled de $total itens preenchidos',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: const Color(0xFF8A8FA3),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  StatusBadge(
+                    label: completed ? 'Concluida' : 'Pendente',
+                    type: completed ? StatusBadgeType.completed : StatusBadgeType.pending,
+                  ),
+                ],
               ),
-              StatusBadge(
-                label: completed ? 'Concluida' : 'Pendente',
-                type: completed ? StatusBadgeType.completed : StatusBadgeType.pending,
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '$filled de $total itens preenchidos',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF8A8FA3),
+                    ),
+                  ),
+                  Text(
+                    '${group.categoryScore.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6D4BC3),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -288,6 +428,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final horizontalPadding = width >= 900 ? width * 0.16 : (width >= 600 ? 24.0 : 20.0);
+    const primaryPurpleColor = Color(0xFF6D4BC3);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F5F5),
@@ -299,26 +440,14 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
           onPressed: () => Navigator.of(context).maybePop(),
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF39306E)),
         ),
-        titleSpacing: 0,
-        title: Align(
-          alignment: Alignment.centerRight,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xFF39306E).withOpacity(0.08),
-            ),
-            child: Text(
-              'AuditApp',
-              style: TextStyle(
-                fontSize: 12,
-                color: const Color(0xFF39306E),
-                fontWeight: FontWeight.w700,
-              ),
+        actions: [
+          IconButton(
+            onPressed: _handleGeneratePdf,
+            icon: const Icon(
+              Icons.insert_drive_file_outlined,
+              color: Color(0xFF39306E),
             ),
           ),
-        ),
-        actions: [
           IconButton(
             onPressed: () => _handleContinueEditing(_loadedAuditStatus),
             icon: Icon(
@@ -380,7 +509,30 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
                               color: const Color(0xFF1C1C1C),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                '${detail.overallScore.toStringAsFixed(1)}%',
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                  color: primaryPurpleColor,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '${detail.compliantCount} conformes • ${detail.nonCompliantCount} nao conformes',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Text(
                             '${detail.formattedCode} - ${_formatDate(detail.startedAt)}',
                             style: TextStyle(
@@ -390,7 +542,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Status: ${detail.status} - Score: ${detail.score ?? '-'}',
+                            'Status: ${_statusLabel(detail.status)}',
                             style: TextStyle(
                               fontSize: 12,
                               color: const Color(0xFF8A8FA3),
@@ -441,6 +593,10 @@ class _AuditDetailData {
   final String formattedCode;
   final String status;
   final dynamic score;
+  final int compliantCount;
+  final int nonCompliantCount;
+  final int evaluatedCount;
+  final double overallScore;
   final DateTime? startedAt;
   final List<_CategoryGroup> groups;
   final int totalItems;
@@ -451,6 +607,10 @@ class _AuditDetailData {
     required this.formattedCode,
     required this.status,
     required this.score,
+    required this.compliantCount,
+    required this.nonCompliantCount,
+    required this.evaluatedCount,
+    required this.overallScore,
     required this.startedAt,
     required this.groups,
     required this.totalItems,
@@ -459,23 +619,29 @@ class _AuditDetailData {
 }
 
 class _CategoryGroup {
+  final String categoryRefPath;
   final String categoryName;
   final int categoryOrder;
+  final double categoryScore;
   final List<_QuestionAnswerItem> items;
 
   const _CategoryGroup({
+    required this.categoryRefPath,
     required this.categoryName,
     required this.categoryOrder,
+    required this.categoryScore,
     required this.items,
   });
 }
 
 class _CategoryGroupBuilder {
+  final String categoryRefPath;
   final String categoryName;
   final int categoryOrder;
   final List<_QuestionAnswerItem> items = [];
 
   _CategoryGroupBuilder({
+    required this.categoryRefPath,
     required this.categoryName,
     required this.categoryOrder,
   });
