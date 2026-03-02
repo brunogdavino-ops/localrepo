@@ -1,8 +1,10 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../models/audit_model.dart';
 import 'audit_fill_page.dart';
+import '../services/audit_pdf_service.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/status_badge.dart';
 
@@ -16,8 +18,12 @@ class AuditDetailPage extends StatefulWidget {
 }
 
 class _AuditDetailPageState extends State<AuditDetailPage> {
+  static const bool _pdfExportEnabled = true;
+
   late final Future<_AuditDetailData> _detailFuture;
+  final AuditPdfService _auditPdfService = AuditPdfService();
   String? _loadedAuditStatus;
+  bool _isGeneratingPdf = false;
 
   @override
   void initState() {
@@ -25,23 +31,36 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     _detailFuture = _loadAuditDetails();
   }
 
+  @override
+  void dispose() {
+    _auditPdfService.dispose();
+    super.dispose();
+  }
+
   Future<_AuditDetailData> _loadAuditDetails() async {
     final firestore = FirebaseFirestore.instance;
 
-    final auditDoc = await firestore.collection('audits').doc(widget.auditId).get();
+    final auditDoc = await firestore
+        .collection('audits')
+        .doc(widget.auditId)
+        .get();
     if (!auditDoc.exists) {
       throw StateError('Auditoria nao encontrada.');
     }
 
     final audit = AuditModel.fromDocument(auditDoc);
     _loadedAuditStatus = audit.status;
-    final answersSnapshot = await auditDoc.reference.collection('answers').get();
+    final answersSnapshot = await auditDoc.reference
+        .collection('answers')
+        .get();
     final questionsSnapshot = await firestore
         .collection('questions')
         .where('templateRef', isEqualTo: audit.templateRef)
         .get();
     final questions = questionsSnapshot.docs;
-    final answers = answersSnapshot.docs.map((doc) => doc.data()).toList(growable: false);
+    final answers = answersSnapshot.docs
+        .map((doc) => doc.data())
+        .toList(growable: false);
     int compliantCount = 0;
     int nonCompliantCount = 0;
     for (final answer in answers) {
@@ -50,7 +69,10 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       if (response == 'non_compliant') nonCompliantCount++;
     }
     final int evaluatedCount = compliantCount + nonCompliantCount;
-    final double overallScore = _calculateWeightedScore(answers, questionsSnapshot.docs);
+    final double overallScore = _calculateWeightedScore(
+      answers,
+      questionsSnapshot.docs,
+    );
 
     final clientRef = audit.clientRef;
     String clientName = 'Cliente sem nome';
@@ -92,7 +114,8 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
       builder.items.add(
         _QuestionAnswerItem(
-          questionText: (questionData['text'] as String?) ?? 'Pergunta sem texto',
+          questionText:
+              (questionData['text'] as String?) ?? 'Pergunta sem texto',
           questionOrder: (questionData['order'] as num?)?.toInt() ?? 999999,
           value: (answerData['value'] as String?) ?? '-',
           weight: answerData['weight'],
@@ -117,7 +140,10 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
     groups.sort((a, b) => a.categoryOrder.compareTo(b.categoryOrder));
 
-    final int totalItems = groups.fold<int>(0, (sum, group) => sum + group.items.length);
+    final int totalItems = groups.fold<int>(
+      0,
+      (sum, group) => sum + group.items.length,
+    );
     final int completedItems = groups.fold<int>(
       0,
       (sum, group) => sum + group.items.where((item) => item.isAnswered).length,
@@ -139,10 +165,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     );
   }
 
-  double _calculateWeightedScore(
-    List answers,
-    List questions,
-  ) {
+  double _calculateWeightedScore(List answers, List questions) {
     double totalEvaluatedWeight = 0;
     double totalCompliantWeight = 0;
 
@@ -185,15 +208,18 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     double totalCompliantWeight = 0;
 
     for (final questionDoc in questions) {
-      final question = questionDoc as QueryDocumentSnapshot<Map<String, dynamic>>;
+      final question =
+          questionDoc as QueryDocumentSnapshot<Map<String, dynamic>>;
       final questionData = question.data();
-      final questionCategoryRef = questionData['categoryRef'] as DocumentReference?;
+      final questionCategoryRef =
+          questionData['categoryRef'] as DocumentReference?;
       if (questionCategoryRef?.path != categoryRef) continue;
 
       Map<String, dynamic>? answer;
       for (final a in answers) {
         final answerData = a as Map<String, dynamic>;
-        final answerQuestionRef = answerData['questionRef'] as DocumentReference?;
+        final answerQuestionRef =
+            answerData['questionRef'] as DocumentReference?;
         if (answerQuestionRef?.path == question.reference.path) {
           answer = answerData;
           break;
@@ -241,23 +267,131 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   void _handleContinueEditing([String? status]) {
     final currentStatus = status ?? _loadedAuditStatus;
     if (!_canContinueEditing(currentStatus)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Auditoria em validacao')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Auditoria em validacao')));
       return;
     }
 
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AuditFillPage(auditId: widget.auditId),
-      ),
+      MaterialPageRoute(builder: (_) => AuditFillPage(auditId: widget.auditId)),
     );
   }
 
-  void _handleGeneratePdf() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Geracao de PDF sera habilitada nesta tela.')),
-    );
+  Future<void> _handleGeneratePdf() async {
+    if (!_pdfExportEnabled || _isGeneratingPdf) return;
+
+    setState(() {
+      _isGeneratingPdf = true;
+    });
+
+    String url;
+    try {
+      url = await _auditPdfService.generatePdfUrl(widget.auditId);
+    } on FirebaseFunctionsException catch (error, stackTrace) {
+      debugPrint('PDF callable error (${error.code}): $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_pdfFunctionErrorMessage(error))));
+      return;
+    } on StateError catch (error, stackTrace) {
+      debugPrint('PDF callable invalid response: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resposta invalida da funcao de PDF.')),
+      );
+      return;
+    } catch (error, stackTrace) {
+      debugPrint('PDF callable unexpected error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falha ao gerar PDF.')));
+      return;
+    }
+
+    String filePath;
+    try {
+      filePath = await _auditPdfService.downloadPdf(url);
+    } on PdfDownloadException catch (error, stackTrace) {
+      debugPrint('PDF download error (status ${error.statusCode}): $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Falha ao baixar PDF (status ${error.statusCode}).'),
+        ),
+      );
+      return;
+    } catch (error, stackTrace) {
+      debugPrint('PDF download unexpected error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falha ao baixar PDF.')));
+      return;
+    }
+
+    try {
+      await _auditPdfService.sharePdf(filePath);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF pronto para compartilhamento.')),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('PDF share error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Falha ao compartilhar PDF.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+        });
+      }
+    }
+  }
+
+  String _pdfFunctionErrorMessage(FirebaseFunctionsException error) {
+    final details = (error.message ?? '').trim();
+    switch (error.code) {
+      case 'permission-denied':
+        return details.isEmpty
+            ? 'Sem permissao para exportar.'
+            : 'Sem permissao para exportar: $details';
+      case 'not-found':
+        return details.isEmpty
+            ? 'Auditoria ou recurso do PDF nao encontrado.'
+            : 'Recurso nao encontrado: $details';
+      case 'invalid-argument':
+        return details.isEmpty
+            ? 'Parametros invalidos para gerar PDF.'
+            : 'Parametro invalido: $details';
+      case 'failed-precondition':
+        return details.isEmpty
+            ? 'Precondicao para gerar PDF nao atendida.'
+            : 'Precondicao nao atendida: $details';
+      case 'unavailable':
+        return details.isEmpty
+            ? 'Funcao de PDF indisponivel.'
+            : 'Funcao de PDF indisponivel: $details';
+      case 'internal':
+        return details.isEmpty
+            ? 'Falha interna ao gerar PDF. Tente novamente.'
+            : 'Falha interna ao gerar PDF: $details';
+      default:
+        if (details.isEmpty) {
+          return 'Falha ao gerar PDF (codigo: ${error.code}).';
+        }
+        return 'Falha ao gerar PDF (${error.code}): $details';
+    }
   }
 
   String _formatDate(DateTime? date) {
@@ -326,10 +460,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
         const SizedBox(height: 8),
         Text(
           '${(progress * 100).round()}% concluido',
-          style: TextStyle(
-            fontSize: 12,
-            color: const Color(0xFF8A8FA3),
-          ),
+          style: TextStyle(fontSize: 12, color: const Color(0xFF8A8FA3)),
         ),
       ],
     );
@@ -342,9 +473,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
     return Container(
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE6E6EF), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE6E6EF), width: 1)),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -369,7 +498,9 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
                   ),
                   StatusBadge(
                     label: completed ? 'Concluida' : 'Pendente',
-                    type: completed ? StatusBadgeType.completed : StatusBadgeType.pending,
+                    type: completed
+                        ? StatusBadgeType.completed
+                        : StatusBadgeType.pending,
                   ),
                 ],
               ),
@@ -395,30 +526,32 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
               ),
             ],
           ),
-          children: group.items.map((item) {
-            return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: Text(
-                item.questionText,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: const Color(0xFF1C1C1C),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                '${item.value} - Peso ${item.weight ?? '-'}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color(0xFF8A8FA3),
-                ),
-              ),
-              trailing: Icon(
-                _valueIcon(item.value),
-                color: _valueColor(item.value),
-              ),
-            );
-          }).toList(growable: false),
+          children: group.items
+              .map((item) {
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  title: Text(
+                    item.questionText,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: const Color(0xFF1C1C1C),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${item.value} - Peso ${item.weight ?? '-'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color(0xFF8A8FA3),
+                    ),
+                  ),
+                  trailing: Icon(
+                    _valueIcon(item.value),
+                    color: _valueColor(item.value),
+                  ),
+                );
+              })
+              .toList(growable: false),
         ),
       ),
     );
@@ -427,7 +560,9 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = width >= 900 ? width * 0.16 : (width >= 600 ? 24.0 : 20.0);
+    final horizontalPadding = width >= 900
+        ? width * 0.16
+        : (width >= 600 ? 24.0 : 20.0);
     const primaryPurpleColor = Color(0xFF6D4BC3);
 
     return Scaffold(
@@ -441,13 +576,25 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF39306E)),
         ),
         actions: [
-          IconButton(
-            onPressed: _handleGeneratePdf,
-            icon: const Icon(
-              Icons.insert_drive_file_outlined,
-              color: Color(0xFF39306E),
+          if (_pdfExportEnabled)
+            IconButton(
+              onPressed: _isGeneratingPdf ? null : _handleGeneratePdf,
+              icon: _isGeneratingPdf
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF39306E),
+                        ),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.insert_drive_file_outlined,
+                      color: Color(0xFF39306E),
+                    ),
             ),
-          ),
           IconButton(
             onPressed: () => _handleContinueEditing(_loadedAuditStatus),
             icon: Icon(
@@ -494,7 +641,12 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 18),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    8,
+                    horizontalPadding,
+                    18,
+                  ),
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -560,7 +712,12 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
               ),
               Container(
                 color: const Color(0xFFF6F5F5),
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 20),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  12,
+                  horizontalPadding,
+                  20,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

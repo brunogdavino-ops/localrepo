@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Relatorio de Auditoria</title>
+  <style>
+    :root {
+      --brand: #39306E;
+      --purple: #7262C2;
+      --text: #1C1C1C;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --bg: #F6F5F5;
+      --good: #16A34A;
+      --regular: #F59E0B;
+      --bad: #DC2626;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: #fff;
+      padding: 24px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .container {
+      width: 100%;
+      border: 1px solid var(--line);
+      padding: 26px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+    }
+    .header h1 {
+      font-size: 18px;
+      color: var(--brand);
+      margin-bottom: 10px;
+      font-weight: 800;
+      letter-spacing: .3px;
+    }
+    .meta p {
+      margin-top: 4px;
+      color: var(--muted);
+    }
+    .meta strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .logo img {
+      width: 160px;
+      object-fit: contain;
+      display: block;
+    }
+    .score-box {
+      display: flex;
+      align-items: end;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .score-value {
+      font-size: 38px;
+      color: var(--purple);
+      font-weight: 800;
+      line-height: 1;
+    }
+    .score-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .section {
+      margin-top: 20px;
+    }
+    .section h2 {
+      font-size: 14px;
+      color: var(--brand);
+      font-weight: 700;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--bg);
+      color: var(--brand);
+      font-weight: 700;
+    }
+    .status-good { color: var(--good); font-weight: 600; }
+    .status-regular { color: var(--regular); font-weight: 600; }
+    .status-bad { color: var(--bad); font-weight: 600; }
+    .nonconform {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+    .nonconform h3 {
+      color: var(--brand);
+      font-size: 13px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    .field {
+      margin-top: 6px;
+    }
+    .field strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .field span {
+      color: var(--muted);
+    }
+    .photos {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .photo-item {
+      width: 180px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 4px;
+      background: #fff;
+    }
+    .photo-item img {
+      width: 100%;
+      max-height: 140px;
+      object-fit: contain;
+      display: block;
+    }
+    .photo-empty {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      width: 180px;
+    }
+    .empty-box {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>RELATORIO DE AUDITORIA SANITARIA</h1>
+        <div class="meta">
+          <p><strong>Cliente:</strong> {{CLIENT_NAME}}</p>
+          <p><strong>Codigo:</strong> {{AUDIT_CODE}}</p>
+          <p><strong>Data:</strong> {{AUDIT_DATE}}</p>
+          <p><strong>Auditora:</strong> {{AUDITOR_NAME}}</p>
+          <p><strong>Status:</strong> {{AUDIT_STATUS}}</p>
+        </div>
+      </div>
+      <div class="logo">
+        <img src="{{LOGO_DATA_URI}}" alt="Logo Artezi" />
+      </div>
+    </div>
+
+    <div class="score-box">
+      <div class="score-value">{{OVERALL_SCORE}}%</div>
+      <div class="score-subtitle">Score final ponderado</div>
+    </div>
+
+    <div class="section">
+      <h2>2. Desempenho por Categoria</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Percentual</th>
+            <th>Classificacao</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{CATEGORY_ROWS}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>3. Nao Conformidades Identificadas</h2>
+      {{NON_COMPLIANCE_ROWS}}
+    </div>
+
+    <div class="section">
+      <h2>4. Checklist Consolidado</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Questao</th>
+            <th>Descricao</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{CHECKLIST_ROWS}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
