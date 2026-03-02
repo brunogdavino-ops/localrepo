@@ -1,18 +1,20 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const filesToCopy = [
-  {
-    from: path.resolve(__dirname, '..', 'src', 'pdf', 'templates', 'audit-report.html'),
-    to: path.resolve(__dirname, '..', 'lib', 'pdf', 'templates', 'audit-report.html')
-  },
-  {
-    from: path.resolve(__dirname, '..', 'src', 'pdf', 'templates', 'logo-artezi.png'),
-    to: path.resolve(__dirname, '..', 'lib', 'pdf', 'templates', 'logo-artezi.png')
+function copyRecursive(sourceDir, targetDir) {
+  fs.mkdirSync(targetDir, { recursive: true });
+  const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const from = path.join(sourceDir, entry.name);
+    const to = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyRecursive(from, to);
+    } else {
+      fs.copyFileSync(from, to);
+    }
   }
-];
-
-for (const file of filesToCopy) {
-  fs.mkdirSync(path.dirname(file.to), { recursive: true });
-  fs.copyFileSync(file.from, file.to);
 }
+
+const templateSourceDir = path.resolve(__dirname, '..', 'src', 'pdf', 'templates');
+const templateTargetDir = path.resolve(__dirname, '..', 'lib', 'pdf', 'templates');
+copyRecursive(templateSourceDir, templateTargetDir);

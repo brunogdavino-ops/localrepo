@@ -2,231 +2,493 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Relatorio de Auditoria</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relatório de Auditoria Sanitária</title>
   <style>
-    :root {
-      --brand: #39306E;
-      --purple: #7262C2;
-      --text: #1C1C1C;
-      --muted: #6B7280;
-      --line: #E5E7EB;
-      --bg: #F6F5F5;
-      --good: #16A34A;
-      --regular: #F59E0B;
-      --bad: #DC2626;
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 400;
+      src: local("Inter"), url("data:font/woff2;base64,{{INTER_400_WOFF2}}") format("woff2");
+      font-display: swap;
     }
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 500;
+      src: local("Inter"), url("data:font/woff2;base64,{{INTER_500_WOFF2}}") format("woff2");
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 600;
+      src: local("Inter"), url("data:font/woff2;base64,{{INTER_600_WOFF2}}") format("woff2");
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 700;
+      src: local("Inter"), url("data:font/woff2;base64,{{INTER_700_WOFF2}}") format("woff2");
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Inter";
+      font-style: normal;
+      font-weight: 800;
+      src: local("Inter"), url("data:font/woff2;base64,{{INTER_800_WOFF2}}") format("woff2");
+      font-display: swap;
+    }
+
+    :root {
+      --brand: #39306e;
+      --purple: #7262c2;
+      --text: #1c1c1c;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --bg: #f6f5f5;
+      --good: #16a34a;
+      --regular: #f59e0b;
+      --bad: #dc2626;
+      --paper: #ffffff;
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
     * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
     }
+
+    html,
     body {
-      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      width: 210mm;
+      min-height: 297mm;
+      background: #f0f0f0;
       color: var(--text);
-      background: #fff;
-      padding: 24px;
-      font-size: 12px;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
       line-height: 1.45;
+      font-size: 12px;
     }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      background: var(--paper);
+      padding: 0;
+    }
+
+    .brand-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 8mm 10mm 6mm;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.08) 100%),
+        #1e212f;
+      color: #ffffff;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .brand-header img {
+      width: 35mm;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .brand-title {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 600;
+      opacity: 0.92;
+      text-align: right;
+    }
+
     .container {
       width: 100%;
       border: 1px solid var(--line);
-      padding: 26px;
+      border-top: none;
+      padding: 9mm;
+      background: var(--paper);
     }
+
     .header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 24px;
+      gap: 10mm;
+      padding-bottom: 5mm;
+      margin-bottom: 6mm;
       border-bottom: 1px solid var(--line);
-      padding-bottom: 18px;
-      margin-bottom: 22px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    .header h1 {
-      font-size: 18px;
-      color: var(--brand);
-      margin-bottom: 10px;
+
+    .header-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-title {
+      font-size: 20px;
       font-weight: 800;
-      letter-spacing: .3px;
+      color: var(--brand);
+      letter-spacing: 0.2px;
+      margin-bottom: 3mm;
+      text-transform: uppercase;
     }
-    .meta p {
-      margin-top: 4px;
+
+    .header-info p {
+      margin-top: 1.6mm;
+      font-size: 12px;
       color: var(--muted);
     }
-    .meta strong {
+
+    .header-info strong {
       color: var(--text);
       font-weight: 600;
     }
-    .logo img {
-      width: 160px;
-      object-fit: contain;
+
+    .header-logo {
+      width: 44mm;
+      flex-shrink: 0;
+    }
+
+    .header-logo img {
+      width: 100%;
+      height: auto;
       display: block;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 3mm;
+      background: #fff;
     }
+
     .score-box {
-      display: flex;
-      align-items: end;
-      gap: 14px;
-      margin-bottom: 20px;
+      margin: 2mm 0 6mm;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    .score-value {
-      font-size: 38px;
+
+    .score {
       color: var(--purple);
+      font-size: 42px;
       font-weight: 800;
       line-height: 1;
     }
-    .score-subtitle {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 5px;
-    }
-    .section {
-      margin-top: 20px;
-    }
-    .section h2 {
+
+    .classificacao {
+      margin-top: 1.6mm;
       font-size: 14px;
+      font-weight: 700;
+      color: var(--brand);
+    }
+
+    .footer-info {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2mm;
+    }
+
+    .section {
+      margin-top: 8mm;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .section h2 {
+      font-size: 16px;
       color: var(--brand);
       font-weight: 700;
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 6px;
-      margin-bottom: 10px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 1.8mm;
+      margin-bottom: 4mm;
     }
+
+    .summary-list {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .summary-list strong {
+      font-weight: 600;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
       font-size: 12px;
     }
-    th, td {
+
+    thead {
+      display: table-header-group;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    th,
+    td {
       border-bottom: 1px solid var(--line);
-      padding: 8px 6px;
       text-align: left;
       vertical-align: top;
+      padding: 2.2mm 2mm;
+      word-break: break-word;
     }
+
     th {
       background: var(--bg);
       color: var(--brand);
       font-weight: 700;
     }
-    .status-good { color: var(--good); font-weight: 600; }
-    .status-regular { color: var(--regular); font-weight: 600; }
-    .status-bad { color: var(--bad); font-weight: 600; }
+
+    .status-good {
+      color: var(--good);
+      font-weight: 600;
+    }
+
+    .status-regular {
+      color: var(--regular);
+      font-weight: 600;
+    }
+
+    .status-bad {
+      color: var(--bad);
+      font-weight: 600;
+    }
+
     .nonconform {
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 12px;
+      padding: 4mm;
+      margin-bottom: 4mm;
       page-break-inside: avoid;
+      break-inside: avoid;
     }
+
     .nonconform h3 {
       color: var(--brand);
       font-size: 13px;
-      margin-bottom: 6px;
       font-weight: 700;
+      margin-bottom: 1.5mm;
     }
-    .field {
-      margin-top: 6px;
-    }
-    .field strong {
-      color: var(--text);
+
+    .label {
+      margin-top: 1.2mm;
+      font-size: 12px;
       font-weight: 600;
+      color: var(--text);
     }
-    .field span {
+
+    .value {
+      margin-top: 0.8mm;
+      font-size: 12px;
       color: var(--muted);
     }
+
     .photos {
-      margin-top: 8px;
+      margin-top: 2mm;
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 2mm;
     }
+
     .photo-item {
-      width: 180px;
+      width: 58mm;
+      min-height: 36mm;
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 4px;
+      padding: 1.2mm;
       background: #fff;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
+
     .photo-item img {
       width: 100%;
-      max-height: 140px;
-      object-fit: contain;
+      max-height: 50mm;
       display: block;
+      object-fit: contain;
+      border-radius: 6px;
     }
-    .photo-empty {
+
+    .photo-empty,
+    .empty-box {
       border: 1px dashed var(--line);
       border-radius: 8px;
-      padding: 10px;
+      padding: 3mm;
       color: var(--muted);
       font-size: 11px;
       text-align: center;
-      width: 180px;
+      background: #fff;
     }
-    .empty-box {
-      border: 1px dashed var(--line);
-      border-radius: 10px;
-      padding: 12px;
+
+    .photo-empty {
+      width: 58mm;
+    }
+
+    .conclusion {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .normative {
+      font-size: 11px;
       color: var(--muted);
+      margin-top: 4mm;
+    }
+
+    .institutional-footer {
+      margin-top: 10mm;
+      padding-top: 6mm;
+      border-top: 1px solid var(--line);
       text-align: center;
+      font-size: 10px;
+      color: var(--muted);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .institutional-footer img {
+      width: 34mm;
+      margin-bottom: 4mm;
+      object-fit: contain;
+    }
+
+    .institutional-footer strong {
+      color: var(--text);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1>RELATORIO DE AUDITORIA SANITARIA</h1>
-        <div class="meta">
+  <div class="page">
+    <div class="brand-header">
+      <img src="{{ARTEZI_LOGO_DATA_URI}}" alt="Logo Artezi" />
+      <div class="brand-title">Relatório Técnico de Auditoria Sanitária</div>
+    </div>
+
+    <div class="container">
+      <header class="header">
+        <div class="header-info">
+          <h1 class="header-title">Relatório de Auditoria Sanitária</h1>
           <p><strong>Cliente:</strong> {{CLIENT_NAME}}</p>
-          <p><strong>Codigo:</strong> {{AUDIT_CODE}}</p>
+          <p><strong>Empresa:</strong> {{COMPANY_NAME}}</p>
+          <p><strong>Operadora do Restaurante:</strong> {{RESTAURANT_OPERATOR}}</p>
           <p><strong>Data:</strong> {{AUDIT_DATE}}</p>
+          <p><strong>Contato empresa:</strong> {{COMPANY_CONTACT}}</p>
+          <p><strong>Endereço:</strong> {{AUDIT_ADDRESS}}</p>
           <p><strong>Auditora:</strong> {{AUDITOR_NAME}}</p>
+          <p><strong>Revisão Técnica e Responsável:</strong> {{TECHNICAL_REVIEWER}}</p>
+          <p><strong>Inauguração:</strong> {{OPENING_DATE}}</p>
+          <p><strong>Auditoria:</strong> {{AUDIT_CODE}}</p>
           <p><strong>Status:</strong> {{AUDIT_STATUS}}</p>
         </div>
+        <div class="header-logo">
+          <img src="{{CLIENT_LOGO_DATA_URI}}" alt="Logo Cliente" />
+        </div>
+      </header>
+
+      <section class="score-box">
+        <div class="score">{{OVERALL_SCORE}}%</div>
+        <div class="classificacao">Classificação: {{OVERALL_CLASSIFICATION}}</div>
+        <div class="footer-info">Artezi Consultoria em Segurança Alimentar</div>
+      </section>
+
+      <section class="section">
+        <h2>1. Visão Geral</h2>
+        <div class="summary-list">
+          A auditoria foi realizada com base nos critérios estabelecidos pela RDC 216 e normas internas aplicáveis.
+          <br /><br />
+          <strong>Resumo:</strong><br />
+          • Nota Geral: {{OVERALL_SCORE}}%<br />
+          • Total de Itens Avaliados: {{TOTAL_EVALUATED_ITEMS}}<br />
+          • Não Conformidades Identificadas: {{NON_COMPLIANT_COUNT}}<br />
+          • Data de emissão: {{ISSUED_AT}}<br />
+          • Próxima auditoria prevista para: -
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>2. Desempenho por Categoria</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Categoria</th>
+              <th>Percentual</th>
+              <th>Classificação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{CATEGORY_ROWS}}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>3. Não Conformidades Identificadas</h2>
+        {{NON_COMPLIANCE_ROWS}}
+      </section>
+
+      <section class="section">
+        <h2>4. Checklist Consolidado</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Questão</th>
+              <th>Descrição</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{CHECKLIST_ROWS}}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>5. Conclusão Técnica</h2>
+        <p class="conclusion">
+          Com base na avaliação realizada, a unidade apresentou classificação
+          <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas
+          prioritárias nos itens identificados como não conformes.
+          <br /><br />
+          Recomenda-se acompanhamento técnico e reavaliação no próximo ciclo de auditoria.
+        </p>
+        <p class="normative">
+          <strong>Referência normativa:</strong> Resolução RDC nº 216, de 15 de setembro de 2004 - ANVISA -
+          Regulamento Técnico de Boas Práticas para Serviços de Alimentação.
+        </p>
+      </section>
+
+      <div class="institutional-footer">
+        <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Logo Institucional" />
+        <p><strong>Claudia Artezi</strong></p>
+        <p>Responsável Técnica</p>
+        <p>Artezi Consultoria em Segurança Alimentar</p>
+        <p>São Paulo - SP</p>
+        <br />
+        <p>
+          Os direitos autorais deste documento pertencem às empresas Artezi e cliente auditado.
+          Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente,
+          sem autorização prévia e expressa.
+        </p>
       </div>
-      <div class="logo">
-        <img src="{{LOGO_DATA_URI}}" alt="Logo Artezi" />
-      </div>
-    </div>
-
-    <div class="score-box">
-      <div class="score-value">{{OVERALL_SCORE}}%</div>
-      <div class="score-subtitle">Score final ponderado</div>
-    </div>
-
-    <div class="section">
-      <h2>2. Desempenho por Categoria</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Categoria</th>
-            <th>Percentual</th>
-            <th>Classificacao</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{CATEGORY_ROWS}}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section">
-      <h2>3. Nao Conformidades Identificadas</h2>
-      {{NON_COMPLIANCE_ROWS}}
-    </div>
-
-    <div class="section">
-      <h2>4. Checklist Consolidado</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Questao</th>
-            <th>Descricao</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{CHECKLIST_ROWS}}
-        </tbody>
-      </table>
     </div>
   </div>
 </body>

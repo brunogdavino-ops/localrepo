@@ -107,3 +107,7 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/LogoAPP.png"
+
+dependency_overrides:
+  path_provider_foundation: 2.4.1
+

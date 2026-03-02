@@ -11,7 +11,7 @@ import {
 import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+import { chromium as playwrightChromium } from 'playwright-core';
 
 import {
   AnswerData,
@@ -22,18 +22,32 @@ import {
   toQuestionsWithOrder
 } from './score';
 
-const MAX_PHOTOS_PER_QUESTION = 3;
+const MAX_PHOTOS_PER_QUESTION = 2;
+const MAX_PHOTO_BYTES = 2_500_000;
+const PHOTO_QUERY_CONCURRENCY = 8;
+const PHOTO_DOWNLOAD_CONCURRENCY = 6;
 const TEMPLATE_FILE = path.resolve(__dirname, 'templates', 'audit-report.html');
-const LOGO_FILE = path.resolve(__dirname, 'templates', 'logo-artezi.png');
+const ARTEZI_LOGO_FILE = path.resolve(__dirname, 'templates', 'logo-artezi.png');
+const CLIENT_LOGO_FILE = path.resolve(__dirname, 'templates', 'logo-atac.png');
+const FOOTER_LOGO_FILE = path.resolve(__dirname, 'templates', 'logo-escura.png');
+const FONT_400_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-400.woff2');
+const FONT_500_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-500.woff2');
+const FONT_600_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-600.woff2');
+const FONT_700_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-700.woff2');
+const FONT_800_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-800.woff2');
 
 type PhotoRecord = { path: string; fileName: string };
 type NonComplianceItem = {
   order: number;
+  categoryName: string;
   questionText: string;
   status: string;
   comment: string;
+  responsible: string;
   photos: string[];
+  failedPhotos: number;
 };
+
 type ChecklistItem = {
   order: number;
   description: string;
@@ -41,24 +55,24 @@ type ChecklistItem = {
   statusClass: string;
 };
 
+type QuestionPhotoStats = {
+  uris: string[];
+  failedCount: number;
+};
+
 function mapToHttpsError(error: unknown): HttpsError {
-  if (error instanceof HttpsError) {
-    return error;
-  }
+  if (error instanceof HttpsError) return error;
 
   const message = error instanceof Error ? error.message : String(error);
 
   if (message.includes('The query requires an index')) {
-    return new HttpsError(
-      'failed-precondition',
-      'Consulta do Firestore requer indice composto.'
-    );
+    return new HttpsError('failed-precondition', 'Consulta do Firestore requer índice composto.');
   }
 
   if (message.includes('Permission') && message.includes('signBlob')) {
     return new HttpsError(
       'failed-precondition',
-      'Permissao insuficiente para assinar URL de download do PDF.'
+      'Permissão insuficiente para assinar URL de download do PDF.'
     );
   }
 
@@ -66,14 +80,15 @@ function mapToHttpsError(error: unknown): HttpsError {
     message.includes('Failed to launch the browser process') ||
     message.includes('Could not find Chrome')
   ) {
-    return new HttpsError(
-      'failed-precondition',
-      'Renderizador de PDF indisponivel no servidor.'
-    );
+    return new HttpsError('failed-precondition', 'Renderizador de PDF indisponível no servidor.');
+  }
+
+  if (message.includes('Memory limit')) {
+    return new HttpsError('failed-precondition', 'Limite de memória excedido durante geração do PDF.');
   }
 
   if (message.includes('No such object')) {
-    return new HttpsError('not-found', 'Arquivo de foto nao encontrado no Storage.');
+    return new HttpsError('not-found', 'Arquivo de foto não encontrado no Storage.');
   }
 
   return new HttpsError('internal', 'Falha interna ao gerar PDF.');
@@ -82,11 +97,15 @@ function mapToHttpsError(error: unknown): HttpsError {
 function asDate(value: unknown): Date | null {
   if (value instanceof Timestamp) return value.toDate();
   if (value instanceof Date) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
   return null;
 }
 
 function datePtBr(date: Date | null): string {
-  if (!date) return '--/--/----';
+  if (!date) return '-';
   return new Intl.DateTimeFormat('pt-BR').format(date);
 }
 
@@ -140,7 +159,7 @@ function assertCanAccessAudit(
   const auditorRef = auditData['auditorRef'] as { id?: string } | undefined;
   const isOwnerAuditor = auditorRef?.id === uid;
   if (!isAdmin && !isOwnerAuditor) {
-    throw new HttpsError('permission-denied', 'Sem permissao para exportar esta auditoria.');
+    throw new HttpsError('permission-denied', 'Sem permissão para exportar esta auditoria.');
   }
 }
 
@@ -153,27 +172,60 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function toDisplay(value: unknown): string {
+  if (typeof value !== 'string') return '-';
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : '-';
+}
+
+function firstText(
+  sources: Array<Record<string, unknown> | undefined>,
+  keys: string[]
+): string {
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+  }
+  return '-';
+}
+
+function firstDateText(
+  sources: Array<Record<string, unknown> | undefined>,
+  keys: string[]
+): string {
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of keys) {
+      const value = source[key];
+      const dateValue = asDate(value);
+      if (dateValue) return datePtBr(dateValue);
+      if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    }
+  }
+  return '-';
+}
+
 async function buildPdfFromHtml(html: string): Promise<Buffer> {
   const executablePath = await chromium.executablePath();
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+  const browser = await playwrightChromium.launch({
     executablePath,
-    defaultViewport: chromium.defaultViewport
+    headless: true,
+    args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox']
   });
 
   try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const page = await browser.newPage({ viewport: chromium.defaultViewport });
+    await page.setContent(html, { waitUntil: 'networkidle' });
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: {
-        top: '14mm',
-        right: '10mm',
-        bottom: '14mm',
-        left: '10mm'
-      }
+      preferCSSPageSize: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' }
     });
     return Buffer.from(pdf);
   } finally {
@@ -190,21 +242,80 @@ function photoMime(pathValue: string): string {
 
 async function photoDataUri(storagePath: string): Promise<string | null> {
   try {
-    const [bytes] = await getStorage().bucket().file(storagePath).download();
-    return `data:${photoMime(storagePath)};base64,${bytes.toString('base64')}`;
+    const file = getStorage().bucket().file(storagePath);
+    const [metadata] = await file.getMetadata();
+    const bytes = Number(metadata.size ?? 0);
+    if (Number.isFinite(bytes) && bytes > MAX_PHOTO_BYTES) {
+      return null;
+    }
+    const [buffer] = await file.download();
+    return `data:${photoMime(storagePath)};base64,${buffer.toString('base64')}`;
   } catch {
     return null;
   }
 }
 
+async function base64OrEmpty(filePath: string, label: string): Promise<string> {
+  try {
+    return (await readFile(filePath)).toString('base64');
+  } catch (error) {
+    console.warn('[generateAuditPdf] asset ausente, usando fallback', { label, filePath, error });
+    return '';
+  }
+}
+
+async function fontBase64OrEmpty(filePath: string): Promise<string> {
+  try {
+    return await readFile(filePath, 'base64');
+  } catch (error) {
+    console.warn('[generateAuditPdf] fonte ausente, usando fallback local()', { filePath, error });
+    return '';
+  }
+}
+
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  if (items.length === 0) return;
+  const size = Math.max(1, concurrency);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(size, items.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) break;
+      await worker(items[index]);
+    }
+  });
+  await Promise.all(runners);
+}
+
 async function renderHtmlTemplate(input: {
-  logoDataUri: string;
+  arteziLogoDataUri: string;
+  clientLogoDataUri: string;
+  footerLogoDataUri: string;
+  inter400: string;
+  inter500: string;
+  inter600: string;
+  inter700: string;
+  inter800: string;
   clientName: string;
-  auditCode: string;
+  companyName: string;
+  restaurantOperator: string;
   auditDate: string;
+  companyContact: string;
+  auditAddress: string;
   auditorName: string;
+  technicalReviewer: string;
+  openingDate: string;
+  auditCode: string;
   auditStatus: string;
+  issuedAt: string;
   overallScore: number;
+  overallClassification: string;
+  totalEvaluatedItems: number;
+  nonCompliantCount: number;
   categoryRows: string;
   nonComplianceRows: string;
   checklistRows: string;
@@ -214,13 +325,30 @@ async function renderHtmlTemplate(input: {
     source.split(token).join(value);
 
   let html = template;
-  html = replaceToken(html, '{{LOGO_DATA_URI}}', input.logoDataUri);
+  html = replaceToken(html, '{{ARTEZI_LOGO_DATA_URI}}', input.arteziLogoDataUri);
+  html = replaceToken(html, '{{CLIENT_LOGO_DATA_URI}}', input.clientLogoDataUri);
+  html = replaceToken(html, '{{FOOTER_LOGO_DATA_URI}}', input.footerLogoDataUri);
+  html = replaceToken(html, '{{INTER_400_WOFF2}}', input.inter400);
+  html = replaceToken(html, '{{INTER_500_WOFF2}}', input.inter500);
+  html = replaceToken(html, '{{INTER_600_WOFF2}}', input.inter600);
+  html = replaceToken(html, '{{INTER_700_WOFF2}}', input.inter700);
+  html = replaceToken(html, '{{INTER_800_WOFF2}}', input.inter800);
   html = replaceToken(html, '{{CLIENT_NAME}}', escapeHtml(input.clientName));
-  html = replaceToken(html, '{{AUDIT_CODE}}', escapeHtml(input.auditCode));
+  html = replaceToken(html, '{{COMPANY_NAME}}', escapeHtml(input.companyName));
+  html = replaceToken(html, '{{RESTAURANT_OPERATOR}}', escapeHtml(input.restaurantOperator));
   html = replaceToken(html, '{{AUDIT_DATE}}', escapeHtml(input.auditDate));
+  html = replaceToken(html, '{{COMPANY_CONTACT}}', escapeHtml(input.companyContact));
+  html = replaceToken(html, '{{AUDIT_ADDRESS}}', escapeHtml(input.auditAddress));
   html = replaceToken(html, '{{AUDITOR_NAME}}', escapeHtml(input.auditorName));
+  html = replaceToken(html, '{{TECHNICAL_REVIEWER}}', escapeHtml(input.technicalReviewer));
+  html = replaceToken(html, '{{OPENING_DATE}}', escapeHtml(input.openingDate));
+  html = replaceToken(html, '{{AUDIT_CODE}}', escapeHtml(input.auditCode));
   html = replaceToken(html, '{{AUDIT_STATUS}}', escapeHtml(input.auditStatus));
+  html = replaceToken(html, '{{ISSUED_AT}}', escapeHtml(input.issuedAt));
   html = replaceToken(html, '{{OVERALL_SCORE}}', input.overallScore.toFixed(1));
+  html = replaceToken(html, '{{OVERALL_CLASSIFICATION}}', escapeHtml(input.overallClassification));
+  html = replaceToken(html, '{{TOTAL_EVALUATED_ITEMS}}', String(input.totalEvaluatedItems));
+  html = replaceToken(html, '{{NON_COMPLIANT_COUNT}}', String(input.nonCompliantCount));
   html = replaceToken(html, '{{CATEGORY_ROWS}}', input.categoryRows);
   html = replaceToken(html, '{{NON_COMPLIANCE_ROWS}}', input.nonComplianceRows);
   html = replaceToken(html, '{{CHECKLIST_ROWS}}', input.checklistRows);
@@ -233,306 +361,440 @@ export const generateAuditPdf = onCall(
     timeoutSeconds: 120
   },
   async (request) => {
-  const startedAtMs = Date.now();
-  const stageStart = new Map<string, number>();
-  const markStage = (name: string): void => {
-    stageStart.set(name, Date.now());
-    console.info('[generateAuditPdf] stage:start', { stage: name });
-  };
-  const endStage = (name: string, extra?: Record<string, unknown>): void => {
-    const start = stageStart.get(name);
-    const elapsedMs = start == null ? null : Date.now() - start;
-    console.info('[generateAuditPdf] stage:end', {
-      stage: name,
-      elapsedMs,
-      ...extra
-    });
-  };
+    const startedAtMs = Date.now();
+    const stageStart = new Map<string, number>();
+    const markStage = (name: string): void => {
+      stageStart.set(name, Date.now());
+      console.info('[generateAuditPdf] stage:start', { stage: name });
+    };
+    const endStage = (name: string, extra?: Record<string, unknown>): void => {
+      const start = stageStart.get(name);
+      const elapsedMs = start == null ? null : Date.now() - start;
+      console.info('[generateAuditPdf] stage:end', {
+        stage: name,
+        elapsedMs,
+        ...extra
+      });
+    };
 
-  try {
-    markStage('start');
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Usuario nao autenticado.');
-    }
-
-    const auditId =
-      typeof request.data?.auditId === 'string' ? request.data.auditId.trim() : '';
-    if (!auditId) {
-      throw new HttpsError('invalid-argument', 'auditId e obrigatorio.');
-    }
-
-    const firestore = getFirestore();
-    const storage = getStorage();
-    const uid = request.auth.uid;
-    console.info('[generateAuditPdf] auth ok', { uid, auditId });
-    endStage('start', { auditId, uid });
-
-    markStage('fetch_audit');
-    const auditRef = firestore.collection('audits').doc(auditId);
-    const auditSnapshot = await auditRef.get();
-    if (!auditSnapshot.exists) {
-      throw new HttpsError('not-found', 'Auditoria nao encontrada.');
-    }
-    endStage('fetch_audit');
-
-    markStage('authz');
-    const auditData = (auditSnapshot.data() ?? {}) as Record<string, unknown>;
-    const userSnapshot = await firestore.collection('users').doc(uid).get();
-    const userData = userSnapshot.data() as Record<string, unknown> | undefined;
-    assertCanAccessAudit(uid, userData, auditData);
-    endStage('authz');
-
-    const templateRef = auditData['templateRef'] as DocumentReference | undefined;
-    if (!templateRef) {
-      throw new HttpsError('failed-precondition', 'Auditoria sem templateRef.');
-    }
-
-    markStage('fetch_questions_categories_answers');
-    const answersSnapshot = await auditRef.collection('answers').get();
-    const [questionsSnapshot, categoriesSnapshot] = await Promise.all([
-      firestore
-        .collection('questions')
-        .where('templateRef', '==', templateRef)
-        .orderBy('order')
-        .get(),
-      firestore
-        .collection('categories')
-        .where('templateref', '==', templateRef)
-        .orderBy('order')
-        .get()
-    ]);
-    endStage('fetch_questions_categories_answers', {
-      answers: answersSnapshot.size,
-      questions: questionsSnapshot.size,
-      categories: categoriesSnapshot.size
-    });
-
-    markStage('build_sections_scores');
-    const answers = answersSnapshot.docs.map((doc) => doc.data() as AnswerData);
-    const questions = questionsSnapshot.docs;
-    const sections = buildOrderedSections(categoriesSnapshot.docs, questions);
-    const overallScore = calculateWeightedScore(answers, questions);
-    endStage('build_sections_scores');
-
-    let clientName = 'Cliente sem nome';
-    const clientRef = auditData['clientRef'] as DocumentReference | undefined;
-    if (clientRef) {
-      const clientSnapshot = await clientRef.get();
-      const clientData = (clientSnapshot.data() ?? {}) as Record<string, unknown>;
-      const name = clientData['name'];
-      if (typeof name === 'string' && name.trim().length > 0) {
-        clientName = name.trim();
+    try {
+      markStage('start');
+      if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Usuário não autenticado.');
       }
-    }
 
-    let auditorName = 'Nao informado';
-    const auditorRef = auditData['auditorRef'] as DocumentReference | undefined;
-    if (auditorRef) {
-      const auditorSnapshot = await auditorRef.get();
-      const auditorData = (auditorSnapshot.data() ?? {}) as Record<string, unknown>;
-      const maybeName = auditorData['name'] ?? auditorData['displayName'] ?? auditorData['username'];
-      if (typeof maybeName === 'string' && maybeName.trim().length > 0) {
-        auditorName = maybeName.trim();
+      const auditId =
+        typeof request.data?.auditId === 'string' ? request.data.auditId.trim() : '';
+      if (!auditId) {
+        throw new HttpsError('invalid-argument', 'auditId é obrigatório.');
       }
-    }
 
-    const answerByQuestionPath = new Map<string, AnswerData>();
-    for (const answer of answers) {
-      const questionRef = answer['questionRef'] as DocumentReference | undefined;
-      if (questionRef?.path) {
-        answerByQuestionPath.set(questionRef.path, answer);
+      const firestore = getFirestore();
+      const storage = getStorage();
+      const uid = request.auth.uid;
+      console.info('[generateAuditPdf] auth ok', { uid, auditId });
+      endStage('start', { auditId, uid });
+
+      markStage('fetch_audit');
+      const auditRef = firestore.collection('audits').doc(auditId);
+      const auditSnapshot = await auditRef.get();
+      if (!auditSnapshot.exists) {
+        throw new HttpsError('not-found', 'Auditoria não encontrada.');
       }
-    }
+      endStage('fetch_audit');
 
-    markStage('load_photos');
-    const photosByQuestionPath = new Map<string, PhotoRecord[]>();
-    for (const answerDoc of answersSnapshot.docs) {
-      const answerData = answerDoc.data() as AnswerData;
-      const response = responseFromAnswer(answerData);
-      if (response !== 'non_compliant') continue;
-      const questionRef = answerData['questionRef'] as DocumentReference | undefined;
-      if (!questionRef) continue;
+      markStage('authz');
+      const auditData = (auditSnapshot.data() ?? {}) as Record<string, unknown>;
+      const userSnapshot = await firestore.collection('users').doc(uid).get();
+      const userData = userSnapshot.data() as Record<string, unknown> | undefined;
+      assertCanAccessAudit(uid, userData, auditData);
+      endStage('authz');
 
-      const photosSnapshot = await answerDoc.ref
-        .collection('photos')
-        .orderBy('createdAt', 'asc')
-        .limit(MAX_PHOTOS_PER_QUESTION)
-        .get();
+      const templateRef = auditData['templateRef'] as DocumentReference | undefined;
+      if (!templateRef) {
+        throw new HttpsError('failed-precondition', 'Auditoria sem templateRef.');
+      }
 
-      photosByQuestionPath.set(
-        questionRef.path,
-        photosSnapshot.docs
-          .map((photo) => {
-            const data = photo.data() as Record<string, unknown>;
-            const pathValue = typeof data['path'] === 'string' ? data['path'] : '';
-            if (!pathValue) return null;
-            const fileName = typeof data['fileName'] === 'string' && data['fileName'].trim()
-              ? data['fileName'].trim()
-              : photo.id;
-            return { path: pathValue, fileName };
-          })
-          .filter((item): item is PhotoRecord => item !== null)
+      const fetchFirestoreStartMs = Date.now();
+      markStage('fetch_questions_categories_answers');
+      const answersSnapshot = await auditRef.collection('answers').get();
+      const [questionsSnapshot, categoriesSnapshot] = await Promise.all([
+        firestore
+          .collection('questions')
+          .where('templateRef', '==', templateRef)
+          .orderBy('order')
+          .get(),
+        firestore
+          .collection('categories')
+          .where('templateref', '==', templateRef)
+          .orderBy('order')
+          .get()
+      ]);
+      endStage('fetch_questions_categories_answers', {
+        answers: answersSnapshot.size,
+        questions: questionsSnapshot.size,
+        categories: categoriesSnapshot.size
+      });
+
+      markStage('build_sections_scores');
+      const answers = answersSnapshot.docs.map((doc) => doc.data() as AnswerData);
+      const questions = questionsSnapshot.docs;
+      const sections = buildOrderedSections(categoriesSnapshot.docs, questions);
+      const overallScore = calculateWeightedScore(answers, questions);
+      endStage('build_sections_scores');
+
+      let clientData: Record<string, unknown> | undefined;
+      let clientName = '-';
+      const clientRef = auditData['clientRef'] as DocumentReference | undefined;
+      if (clientRef) {
+        const clientSnapshot = await clientRef.get();
+        clientData = (clientSnapshot.data() ?? {}) as Record<string, unknown>;
+        clientName = firstText([clientData], ['name', 'clientName', 'razaoSocial']);
+      }
+
+      let auditorData: Record<string, unknown> | undefined;
+      let auditorName = '-';
+      const auditorRef = auditData['auditorRef'] as DocumentReference | undefined;
+      if (auditorRef) {
+        const auditorSnapshot = await auditorRef.get();
+        auditorData = (auditorSnapshot.data() ?? {}) as Record<string, unknown>;
+        auditorName = firstText([auditorData], ['name', 'displayName', 'username']);
+      }
+
+      const answerByQuestionPath = new Map<string, AnswerData>();
+      for (const answer of answers) {
+        const questionRef = answer['questionRef'] as DocumentReference | undefined;
+        if (questionRef?.path) {
+          answerByQuestionPath.set(questionRef.path, answer);
+        }
+      }
+
+      const nonCompliantCount = answers.filter(
+        (answer) => responseFromAnswer(answer) === 'non_compliant'
+      ).length;
+      const totalEvaluatedItems = answers.filter((answer) => {
+        const response = responseFromAnswer(answer);
+        return response === 'compliant' || response === 'non_compliant';
+      }).length;
+
+      const imageDownloadStartMs = Date.now();
+      markStage('load_photos');
+      const photosByQuestionPath = new Map<string, PhotoRecord[]>();
+      const nonCompliantAnswerDocs = answersSnapshot.docs.filter((answerDoc) => {
+        const answerData = answerDoc.data() as AnswerData;
+        const response = responseFromAnswer(answerData);
+        return response === 'non_compliant';
+      });
+      await mapWithConcurrency(
+        nonCompliantAnswerDocs,
+        PHOTO_QUERY_CONCURRENCY,
+        async (answerDoc) => {
+          const answerData = answerDoc.data() as AnswerData;
+          const questionRef = answerData['questionRef'] as DocumentReference | undefined;
+          if (!questionRef) return;
+
+          const photosSnapshot = await answerDoc.ref
+            .collection('photos')
+            .orderBy('createdAt', 'asc')
+            .limit(MAX_PHOTOS_PER_QUESTION)
+            .get();
+
+          photosByQuestionPath.set(
+            questionRef.path,
+            photosSnapshot.docs
+              .map((photo) => {
+                const data = photo.data() as Record<string, unknown>;
+                const pathValue = typeof data['path'] === 'string' ? data['path'] : '';
+                if (!pathValue) return null;
+                const fileName =
+                  typeof data['fileName'] === 'string' && data['fileName'].trim()
+                    ? data['fileName'].trim()
+                    : photo.id;
+                return { path: pathValue, fileName };
+              })
+              .filter((item): item is PhotoRecord => item !== null)
+          );
+        }
       );
-    }
-    endStage('load_photos');
+      endStage('load_photos');
+      const fetchFirestoreMs = Date.now() - fetchFirestoreStartMs;
 
-    const rawAuditNumber = auditData['auditnumber'];
-    const auditNumber = typeof rawAuditNumber === 'number' ? rawAuditNumber : null;
-    const auditCode =
-      auditNumber == null ? `AUD-${auditId}` : `ART-${String(auditNumber).padStart(4, '0')}`;
-    const startedAt = asDate(auditData['startedAt']);
-    const status = typeof auditData['status'] === 'string' ? auditData['status'] : '';
+      const rawAuditNumber = auditData['auditnumber'];
+      const auditNumber = typeof rawAuditNumber === 'number' ? rawAuditNumber : null;
+      const auditCode =
+        auditNumber == null ? `AUD-${auditId}` : `ART-${String(auditNumber).padStart(4, '0')}`;
+      const startedAt = asDate(auditData['startedAt']);
+      const status = typeof auditData['status'] === 'string' ? auditData['status'] : '';
 
-    const categoryRows = sections
-      .map((section) => {
-        const score = calculateCategoryWeightedScore(section.path, questions, answers);
-        const cls = scoreClass(score);
-        return `<tr><td>${escapeHtml(section.name)}</td><td>${score.toFixed(1)}%</td><td class="${cls.className}">${cls.label}</td></tr>`;
-      })
-      .join('');
+      const categoryRows = sections
+        .map((section) => {
+          const score = calculateCategoryWeightedScore(section.path, questions, answers);
+          const cls = scoreClass(score);
+          return `<tr><td>${escapeHtml(section.name)}</td><td>${score.toFixed(1)}%</td><td class="${cls.className}">${cls.label}</td></tr>`;
+        })
+        .join('');
 
-    const questionOrder = toQuestionsWithOrder(
-      questions as QueryDocumentSnapshot[]
-    ).sort((a, b) => a.order - b.order);
+      const sectionByPath = new Map(sections.map((section) => [section.path, section]));
+      const questionOrder = toQuestionsWithOrder(
+        questions as QueryDocumentSnapshot[]
+      ).sort((a, b) => a.order - b.order);
 
-    const nonConformityItems: NonComplianceItem[] = [];
-    const checklistItems: ChecklistItem[] = [];
-    for (const question of questionOrder) {
-      const answer = answerByQuestionPath.get(question.path);
-      const response = responseFromAnswer(answer ?? {});
-      const statusLabel = ptBrResponse(response);
-      const statusCss = responseClass(response);
-
-      checklistItems.push({
-        order: question.order,
-        description: question.text,
-        status: statusLabel,
-        statusClass: statusCss
-      });
-
-      if (response !== 'non_compliant') continue;
-      const notesValue = answer?.['notes'] ?? answer?.['comment'] ?? '';
-      const comment = typeof notesValue === 'string' && notesValue.trim().length > 0
-        ? notesValue.trim()
-        : 'Sem comentario.';
-      const photos = photosByQuestionPath.get(question.path) ?? [];
-      const photoUris = (
-        await Promise.all(
-          photos.slice(0, MAX_PHOTOS_PER_QUESTION).map((photo) => photoDataUri(photo.path))
-        )
-      ).filter((value): value is string => value != null);
-      nonConformityItems.push({
-        order: question.order,
-        questionText: question.text,
-        status: statusLabel,
-        comment,
-        photos: photoUris
-      });
-    }
-
-    const nonComplianceRows =
-      nonConformityItems.length === 0
-        ? '<div class="empty-box">Nenhuma nao conformidade identificada.</div>'
-        : nonConformityItems
-            .map((item) => {
-              const photosHtml =
-                item.photos.length === 0
-                  ? '<div class="photo-empty">Sem evidencia fotografica.</div>'
-                  : item.photos
-                      .map(
-                        (photo) =>
-                          `<div class="photo-item"><img src="${photo}" alt="Evidencia"/></div>`
-                      )
-                      .join('');
-              return `<div class="nonconform">
-                <h3>Questao ${item.order}</h3>
-                <div class="field"><strong>Pergunta:</strong> <span>${escapeHtml(item.questionText)}</span></div>
-                <div class="field"><strong>Status:</strong> <span class="status-bad">${escapeHtml(item.status)}</span></div>
-                <div class="field"><strong>Comentario:</strong> <span>${escapeHtml(item.comment)}</span></div>
-                <div class="field"><strong>Evidencias:</strong></div>
-                <div class="photos">${photosHtml}</div>
-              </div>`;
-            })
-            .join('');
-
-    const checklistRows = checklistItems
-      .map(
-        (item) =>
-          `<tr><td>${item.order}</td><td>${escapeHtml(item.description)}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`
-      )
-      .join('');
-
-    markStage('render_html');
-    let logoDataUri = '';
-    try {
-      logoDataUri = `data:image/png;base64,${(await readFile(LOGO_FILE)).toString('base64')}`;
-    } catch (error) {
-      console.warn('[generateAuditPdf] logo ausente, seguindo sem logo', { error });
-    }
-    const html = await renderHtmlTemplate({
-      logoDataUri,
-      clientName,
-      auditCode,
-      auditDate: datePtBr(startedAt),
-      auditorName,
-      auditStatus: ptBrStatus(status),
-      overallScore,
-      categoryRows,
-      nonComplianceRows,
-      checklistRows
-    });
-    endStage('render_html');
-
-    markStage('render_pdf');
-    const pdfBuffer = await buildPdfFromHtml(html);
-    endStage('render_pdf', { bytes: pdfBuffer.length });
-
-    markStage('upload_storage');
-    const timestamp = Date.now();
-    const reportPath = `audit_reports/${auditId}/audit_${timestamp}.pdf`;
-    const file = storage.bucket().file(reportPath);
-    await file.save(pdfBuffer, {
-      contentType: 'application/pdf',
-      resumable: false,
-      metadata: { cacheControl: 'private, max-age=300' }
-    });
-    endStage('upload_storage', { reportPath });
-
-    markStage('signed_url');
-    const expires = Date.now() + 60 * 60 * 1000;
-    let url: string;
-    let expiresAt: string;
-    try {
-      const [signedUrl] = await file.getSignedUrl({
-        action: 'read',
-        expires
-      });
-      url = signedUrl;
-      expiresAt = new Date(expires).toISOString();
-      endStage('signed_url');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('signBlob')) {
-        throw error;
+      const questionPhotoStats = new Map<string, QuestionPhotoStats>();
+      const photoDownloadQueue: Array<{ questionPath: string; storagePath: string }> = [];
+      for (const [questionPath, photoRecords] of photosByQuestionPath.entries()) {
+        questionPhotoStats.set(questionPath, { uris: [], failedCount: 0 });
+        for (const photo of photoRecords) {
+          photoDownloadQueue.push({ questionPath, storagePath: photo.path });
+        }
       }
-      const token = randomUUID();
-      await file.setMetadata({
-        metadata: { firebaseStorageDownloadTokens: token }
-      });
-      const encodedPath = encodeURIComponent(reportPath);
-      url = `https://firebasestorage.googleapis.com/v0/b/${storage.bucket().name}/o/${encodedPath}?alt=media&token=${token}`;
-      expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      endStage('signed_url', { fallbackToken: true });
-    }
+      await mapWithConcurrency(
+        photoDownloadQueue,
+        PHOTO_DOWNLOAD_CONCURRENCY,
+        async ({ questionPath, storagePath }) => {
+          const stats = questionPhotoStats.get(questionPath);
+          if (!stats) return;
+          const photoUri = await photoDataUri(storagePath);
+          if (photoUri == null) {
+            stats.failedCount += 1;
+          } else {
+            stats.uris.push(photoUri);
+          }
+        }
+      );
 
-    console.info('[generateAuditPdf] done', { totalElapsedMs: Date.now() - startedAtMs });
-    return { url, path: reportPath, expiresAt };
-  } catch (error) {
-    console.error('[generateAuditPdf] falha', {
-      totalElapsedMs: Date.now() - startedAtMs,
-      error
-    });
-    throw mapToHttpsError(error);
-  }
+      const nonConformityItems: NonComplianceItem[] = [];
+      const checklistItems: ChecklistItem[] = [];
+      for (const question of questionOrder) {
+        const answer = answerByQuestionPath.get(question.path);
+        const response = responseFromAnswer(answer ?? {});
+        const statusLabel = ptBrResponse(response);
+        const statusCss = responseClass(response);
+
+        checklistItems.push({
+          order: question.order,
+          description: question.text,
+          status: statusLabel,
+          statusClass: statusCss
+        });
+
+        if (response !== 'non_compliant') continue;
+        const notesValue = answer?.['notes'] ?? answer?.['comment'] ?? '';
+        const comment =
+          typeof notesValue === 'string' && notesValue.trim().length > 0
+            ? notesValue.trim()
+            : 'Sem comentário.';
+        const photoStats = questionPhotoStats.get(question.path);
+        const photoUris = photoStats?.uris ?? [];
+        const failedPhotos = photoStats?.failedCount ?? 0;
+        const categoryName = sectionByPath.get(question.categoryPath)?.name ?? 'Sem categoria';
+
+        nonConformityItems.push({
+          order: question.order,
+          categoryName,
+          questionText: question.text,
+          status: statusLabel,
+          comment,
+          responsible: 'N/A',
+          photos: photoUris,
+          failedPhotos
+        });
+      }
+      const imageDownloadMs = Date.now() - imageDownloadStartMs;
+
+      const nonComplianceRows =
+        nonConformityItems.length === 0
+          ? '<div class="empty-box">Nenhuma não conformidade identificada.</div>'
+          : nonConformityItems
+              .map((item) => {
+                const photosHtml =
+                  item.photos.length === 0 && item.failedPhotos === 0
+                    ? '<div class="photo-empty">Sem evidência fotográfica.</div>'
+                    : [
+                        ...item.photos.map(
+                          (photo) =>
+                            `<div class="photo-item"><img src="${photo}" alt="Evidência" /></div>`
+                        ),
+                        ...Array.from(
+                          { length: item.failedPhotos },
+                          () => '<div class="photo-empty">Foto indisponível.</div>'
+                        )
+                      ].join('');
+                return `<div class="nonconform">
+                  <h3>Categoria: ${escapeHtml(item.categoryName)} - Questão ${item.order}</h3>
+                  <div class="label">Descrição da Pergunta:</div>
+                  <div class="value">${escapeHtml(item.questionText)}</div>
+                  <div class="label">Status:</div>
+                  <div class="value status-bad">${escapeHtml(item.status)}</div>
+                  <div class="label">Responsável:</div>
+                  <div class="value">${escapeHtml(item.responsible)}</div>
+                  <div class="label">Descrição da Auditora:</div>
+                  <div class="value">${escapeHtml(item.comment)}</div>
+                  <div class="label">Evidências Fotográficas:</div>
+                  <div class="photos">${photosHtml}</div>
+                </div>`;
+              })
+              .join('');
+
+      const checklistRows = checklistItems
+        .map(
+          (item) =>
+            `<tr><td>${item.order}</td><td>${escapeHtml(item.description)}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`
+        )
+        .join('');
+
+      const renderHtmlStartMs = Date.now();
+      markStage('render_html');
+      const [arteziLogoDataUri, clientLogoDataUri, footerLogoDataUri] = await Promise.all([
+        base64OrEmpty(ARTEZI_LOGO_FILE, 'artezi-logo').then((b64) =>
+          b64 ? `data:image/png;base64,${b64}` : ''
+        ),
+        base64OrEmpty(CLIENT_LOGO_FILE, 'client-logo').then((b64) =>
+          b64 ? `data:image/png;base64,${b64}` : ''
+        ),
+        base64OrEmpty(FOOTER_LOGO_FILE, 'footer-logo').then((b64) =>
+          b64 ? `data:image/png;base64,${b64}` : ''
+        )
+      ]);
+      const [inter400, inter500, inter600, inter700, inter800] = await Promise.all([
+        fontBase64OrEmpty(FONT_400_FILE),
+        fontBase64OrEmpty(FONT_500_FILE),
+        fontBase64OrEmpty(FONT_600_FILE),
+        fontBase64OrEmpty(FONT_700_FILE),
+        fontBase64OrEmpty(FONT_800_FILE)
+      ]);
+
+      const companyName = firstText([auditData, clientData], [
+        'companyName',
+        'company',
+        'empresa',
+        'name'
+      ]);
+      const restaurantOperator = firstText([auditData, clientData], [
+        'restaurantOperator',
+        'operator',
+        'operadora',
+        'operadoraRestaurante'
+      ]);
+      const companyContact = firstText([auditData, clientData], [
+        'companyContact',
+        'contact',
+        'responsavel',
+        'contactName'
+      ]);
+      const auditAddress = firstText([auditData, clientData], [
+        'auditAddress',
+        'address',
+        'endereco'
+      ]);
+      const technicalReviewer = firstText([auditData, clientData], [
+        'technicalReviewer',
+        'revisaoTecnica',
+        'responsavelTecnico'
+      ]);
+      const openingDate = firstDateText([auditData, clientData], [
+        'openingDate',
+        'inauguracao',
+        'openedAt'
+      ]);
+      const overallClassification = scoreClass(overallScore).label.toUpperCase();
+
+      const html = await renderHtmlTemplate({
+        arteziLogoDataUri,
+        clientLogoDataUri,
+        footerLogoDataUri,
+        inter400,
+        inter500,
+        inter600,
+        inter700,
+        inter800,
+        clientName: toDisplay(clientName),
+        companyName: toDisplay(companyName),
+        restaurantOperator: toDisplay(restaurantOperator),
+        auditDate: datePtBr(startedAt),
+        companyContact: toDisplay(companyContact),
+        auditAddress: toDisplay(auditAddress),
+        auditorName: toDisplay(auditorName),
+        technicalReviewer: toDisplay(technicalReviewer),
+        openingDate: toDisplay(openingDate),
+        auditCode: toDisplay(auditCode),
+        auditStatus: ptBrStatus(status),
+        issuedAt: datePtBr(new Date()),
+        overallScore,
+        overallClassification,
+        totalEvaluatedItems,
+        nonCompliantCount,
+        categoryRows,
+        nonComplianceRows,
+        checklistRows
+      });
+      endStage('render_html');
+      const renderHtmlMs = Date.now() - renderHtmlStartMs;
+
+      markStage('render_pdf');
+      const renderPdfStartMs = Date.now();
+      const pdfBuffer = await buildPdfFromHtml(html);
+      endStage('render_pdf', { bytes: pdfBuffer.length });
+      const renderPdfMs = Date.now() - renderPdfStartMs;
+
+      markStage('upload_storage');
+      const uploadStartMs = Date.now();
+      const timestamp = Date.now();
+      const reportPath = `audit_reports/${auditId}/audit_${timestamp}.pdf`;
+      const file = storage.bucket().file(reportPath);
+      await file.save(pdfBuffer, {
+        contentType: 'application/pdf',
+        resumable: false,
+        metadata: { cacheControl: 'private, max-age=300' }
+      });
+      endStage('upload_storage', { reportPath });
+      const uploadStorageMs = Date.now() - uploadStartMs;
+
+      markStage('signed_url');
+      const expires = Date.now() + 60 * 60 * 1000;
+      let url: string;
+      let expiresAt: string;
+      try {
+        const [signedUrl] = await file.getSignedUrl({
+          action: 'read',
+          expires
+        });
+        url = signedUrl;
+        expiresAt = new Date(expires).toISOString();
+        endStage('signed_url');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('signBlob')) {
+          throw error;
+        }
+        const token = randomUUID();
+        await file.setMetadata({
+          metadata: { firebaseStorageDownloadTokens: token }
+        });
+        const encodedPath = encodeURIComponent(reportPath);
+        url = `https://firebasestorage.googleapis.com/v0/b/${storage.bucket().name}/o/${encodedPath}?alt=media&token=${token}`;
+        expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        endStage('signed_url', { fallbackToken: true });
+      }
+
+      const totalElapsedMs = Date.now() - startedAtMs;
+      const pdfSizeBytes = pdfBuffer.length;
+      console.info('[generateAuditPdf] perf', {
+        fetchFirestoreMs,
+        imageDownloadMs,
+        renderHtmlMs,
+        renderPdfMs,
+        uploadStorageMs,
+        totalElapsedMs,
+        pdfSizeBytes
+      });
+      console.info('[generateAuditPdf] done', { totalElapsedMs });
+      return { url, path: reportPath, expiresAt };
+    } catch (error) {
+      console.error('[generateAuditPdf] falha', {
+        totalElapsedMs: Date.now() - startedAtMs,
+        error
+      });
+      throw mapToHttpsError(error);
+    }
   }
 );

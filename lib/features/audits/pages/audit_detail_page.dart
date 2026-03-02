@@ -50,13 +50,19 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
     final audit = AuditModel.fromDocument(auditDoc);
     _loadedAuditStatus = audit.status;
-    final answersSnapshot = await auditDoc.reference
-        .collection('answers')
-        .get();
-    final questionsSnapshot = await firestore
+    final answersFuture = auditDoc.reference.collection('answers').get();
+    final questionsFuture = firestore
         .collection('questions')
         .where('templateRef', isEqualTo: audit.templateRef)
         .get();
+    final categoriesFuture = firestore
+        .collection('categories')
+        .where('templateref', isEqualTo: audit.templateRef)
+        .get();
+
+    final answersSnapshot = await answersFuture;
+    final questionsSnapshot = await questionsFuture;
+    final categoriesSnapshot = await categoriesFuture;
     final questions = questionsSnapshot.docs;
     final answers = answersSnapshot.docs
         .map((doc) => doc.data())
@@ -83,32 +89,37 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       clientName = name;
     }
 
-    final Map<String, _CategoryGroupBuilder> grouped = {};
+    final questionsByPath = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    for (final questionDoc in questionsSnapshot.docs) {
+      questionsByPath[questionDoc.reference.path] = questionDoc;
+    }
 
+    final categoriesByPath = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    for (final categoryDoc in categoriesSnapshot.docs) {
+      categoriesByPath[categoryDoc.reference.path] = categoryDoc;
+    }
+
+    final Map<String, _CategoryGroupBuilder> grouped = {};
     for (final answerDoc in answersSnapshot.docs) {
       final answerData = answerDoc.data();
       final questionRef = answerData['questionRef'] as DocumentReference?;
       if (questionRef == null) continue;
 
-      final questionSnapshot = await questionRef.get();
-      if (!questionSnapshot.exists) continue;
+      final questionDoc = questionsByPath[questionRef.path];
+      if (questionDoc == null) continue;
+      final questionData = questionDoc.data();
 
-      final questionData = questionSnapshot.data() as Map<String, dynamic>;
       final categoryRef = questionData['categoryRef'] as DocumentReference?;
-      if (categoryRef == null) continue;
-
-      final categorySnapshot = await categoryRef.get();
-      if (!categorySnapshot.exists) continue;
-
-      final categoryData = categorySnapshot.data() as Map<String, dynamic>;
-      final categoryId = categorySnapshot.id;
+      final categoryPath = categoryRef?.path ?? '__sem_categoria__';
+      final categoryDoc = categoryRef == null ? null : categoriesByPath[categoryPath];
+      final categoryData = categoryDoc?.data();
 
       final builder = grouped.putIfAbsent(
-        categoryId,
+        categoryPath,
         () => _CategoryGroupBuilder(
-          categoryRefPath: categorySnapshot.reference.path,
-          categoryName: (categoryData['name'] as String?) ?? 'Sem categoria',
-          categoryOrder: (categoryData['order'] as num?)?.toInt() ?? 999999,
+          categoryRefPath: categoryPath,
+          categoryName: (categoryData?['name'] as String?) ?? 'Sem categoria',
+          categoryOrder: (categoryData?['order'] as num?)?.toInt() ?? 999999,
         ),
       );
 
