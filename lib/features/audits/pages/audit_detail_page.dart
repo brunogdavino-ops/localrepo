@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../models/audit_model.dart';
 import 'audit_fill_page.dart';
 import '../services/audit_pdf_service.dart';
+import '../services/audit_score_service.dart';
+import '../utils/category_name_formatter.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/status_badge.dart';
 
@@ -19,9 +21,11 @@ class AuditDetailPage extends StatefulWidget {
 
 class _AuditDetailPageState extends State<AuditDetailPage> {
   static const bool _pdfExportEnabled = true;
+  static const bool _refreshScoreBeforePdf = true;
 
   late final Future<_AuditDetailData> _detailFuture;
   final AuditPdfService _auditPdfService = AuditPdfService();
+  final AuditScoreService _auditScoreService = AuditScoreService();
   String? _loadedAuditStatus;
   bool _isGeneratingPdf = false;
 
@@ -67,6 +71,8 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     final answers = answersSnapshot.docs
         .map((doc) => doc.data())
         .toList(growable: false);
+    final persistedScoreByCategory = audit.scoreByCategory;
+
     int compliantCount = 0;
     int nonCompliantCount = 0;
     for (final answer in answers) {
@@ -75,10 +81,12 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       if (response == 'non_compliant') nonCompliantCount++;
     }
     final int evaluatedCount = compliantCount + nonCompliantCount;
-    final double overallScore = _calculateWeightedScore(
+    final localOverallScore = _calculateWeightedScore(
       answers,
       questionsSnapshot.docs,
     );
+    final overallScore = audit.scoreFinal ?? localOverallScore;
+    final usedOverallScoreFallback = audit.scoreFinal == null;
 
     final clientRef = audit.clientRef;
     String clientName = 'Cliente sem nome';
@@ -89,12 +97,14 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       clientName = name;
     }
 
-    final questionsByPath = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    final questionsByPath =
+        <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
     for (final questionDoc in questionsSnapshot.docs) {
       questionsByPath[questionDoc.reference.path] = questionDoc;
     }
 
-    final categoriesByPath = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    final categoriesByPath =
+        <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
     for (final categoryDoc in categoriesSnapshot.docs) {
       categoriesByPath[categoryDoc.reference.path] = categoryDoc;
     }
@@ -111,14 +121,18 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
       final categoryRef = questionData['categoryRef'] as DocumentReference?;
       final categoryPath = categoryRef?.path ?? '__sem_categoria__';
-      final categoryDoc = categoryRef == null ? null : categoriesByPath[categoryPath];
+      final categoryDoc = categoryRef == null
+          ? null
+          : categoriesByPath[categoryPath];
       final categoryData = categoryDoc?.data();
 
       final builder = grouped.putIfAbsent(
         categoryPath,
         () => _CategoryGroupBuilder(
           categoryRefPath: categoryPath,
-          categoryName: (categoryData?['name'] as String?) ?? 'Sem categoria',
+          categoryName: formatCategoryName(
+            (categoryData?['name'] as String?) ?? 'Sem categoria',
+          ),
           categoryOrder: (categoryData?['order'] as num?)?.toInt() ?? 999999,
         ),
       );
@@ -134,17 +148,24 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       );
     }
 
+    int categoryFallbackCount = 0;
     final groups = grouped.values.map((builder) {
       builder.items.sort((a, b) => a.questionOrder.compareTo(b.questionOrder));
+      final localCategoryScore = _calculateCategoryWeightedScore(
+        builder.categoryRefPath,
+        questions,
+        answers,
+      );
+      final persistedCategoryScore =
+          persistedScoreByCategory[builder.categoryRefPath];
+      if (persistedCategoryScore == null) {
+        categoryFallbackCount += 1;
+      }
       return _CategoryGroup(
         categoryRefPath: builder.categoryRefPath,
         categoryName: builder.categoryName,
         categoryOrder: builder.categoryOrder,
-        categoryScore: _calculateCategoryWeightedScore(
-          builder.categoryRefPath,
-          questions,
-          answers,
-        ),
+        categoryScore: persistedCategoryScore ?? localCategoryScore,
         items: builder.items,
       );
     }).toList();
@@ -160,6 +181,14 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       (sum, group) => sum + group.items.where((item) => item.isAnswered).length,
     );
 
+    if (usedOverallScoreFallback || categoryFallbackCount > 0) {
+      debugPrint(
+        'AuditDetail fallback score used for audit ${widget.auditId}: '
+        'overallFallback=$usedOverallScoreFallback, '
+        'categoryFallbackCount=$categoryFallbackCount',
+      );
+    }
+
     return _AuditDetailData(
       clientName: clientName,
       formattedCode: audit.formattedCode,
@@ -173,6 +202,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       groups: groups,
       totalItems: totalItems,
       completedItems: completedItems,
+      usedScoreFallback: usedOverallScoreFallback || categoryFallbackCount > 0,
     );
   }
 
@@ -298,6 +328,28 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
     String url;
     try {
+      if (_refreshScoreBeforePdf) {
+        try {
+          await _auditScoreService.computeAndPersistScore(widget.auditId);
+        } on FirebaseFunctionsException catch (error) {
+          debugPrint(
+            'computeAndPersistAuditScore before PDF failed (${error.code}): ${error.message}',
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Nao foi possivel atualizar o score agora. PDF sera gerado com o ultimo score salvo.',
+                ),
+              ),
+            );
+          }
+        } catch (error) {
+          debugPrint(
+            'computeAndPersistAuditScore before PDF unexpected error: $error',
+          );
+        }
+      }
       url = await _auditPdfService.generatePdfUrl(widget.auditId);
     } on FirebaseFunctionsException catch (error, stackTrace) {
       debugPrint('PDF callable error (${error.code}): $error');
@@ -499,7 +551,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      group.categoryName.toUpperCase(),
+                      formatCategoryName(group.categoryName),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -769,6 +821,7 @@ class _AuditDetailData {
   final List<_CategoryGroup> groups;
   final int totalItems;
   final int completedItems;
+  final bool usedScoreFallback;
 
   const _AuditDetailData({
     required this.clientName,
@@ -783,6 +836,7 @@ class _AuditDetailData {
     required this.groups,
     required this.totalItems,
     required this.completedItems,
+    required this.usedScoreFallback,
   });
 }
 

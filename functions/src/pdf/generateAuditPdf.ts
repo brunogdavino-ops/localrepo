@@ -12,18 +12,22 @@ import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import chromium from '@sparticuz/chromium';
 import { chromium as playwrightChromium } from 'playwright-core';
+import sharp from 'sharp';
 
 import {
   AnswerData,
   buildOrderedSections,
   calculateCategoryWeightedScore,
   calculateWeightedScore,
+  questionPathFromAnswer,
   responseFromAnswer,
   toQuestionsWithOrder
 } from './score';
 
 const MAX_PHOTOS_PER_QUESTION = 2;
-const MAX_PHOTO_BYTES = 2_500_000;
+const MAX_INPUT_PHOTO_BYTES = 12_000_000;
+const IMAGE_MAX_WIDTH_PX = 1200;
+const IMAGE_JPEG_QUALITY = 72;
 const PHOTO_QUERY_CONCURRENCY = 8;
 const PHOTO_DOWNLOAD_CONCURRENCY = 6;
 const TEMPLATE_FILE = path.resolve(__dirname, 'templates', 'audit-report.html');
@@ -35,6 +39,8 @@ const FONT_500_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-500.w
 const FONT_600_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-600.woff2');
 const FONT_700_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-700.woff2');
 const FONT_800_FILE = path.resolve(__dirname, 'templates', 'fonts', 'inter-800.woff2');
+const PDF_CATEGORY_BAR_TRACK_COLOR = '#E3E3EC';
+const PDF_ENCODING_SENTINEL = 'RELATÓRIO DE AUDITORIA SANITÁRIA';
 
 type PhotoRecord = { path: string; fileName: string };
 type NonComplianceItem = {
@@ -50,6 +56,7 @@ type NonComplianceItem = {
 
 type ChecklistItem = {
   order: number;
+  categoryName: string;
   description: string;
   status: string;
   statusClass: string;
@@ -58,6 +65,12 @@ type ChecklistItem = {
 type QuestionPhotoStats = {
   uris: string[];
   failedCount: number;
+};
+
+type ProcessedPhotoResult = {
+  uri: string | null;
+  originalBytes: number;
+  processedBytes: number;
 };
 
 function mapToHttpsError(error: unknown): HttpsError {
@@ -146,7 +159,9 @@ function scoreClass(score: number): { label: string; className: string } {
 function responseClass(response: string | null): string {
   if (response === 'compliant') return 'status-good';
   if (response === 'non_compliant') return 'status-bad';
-  return 'status-regular';
+  if (response === 'not_applicable') return 'status-na';
+  if (response === 'not_observed') return 'status-not-observed';
+  return 'status-muted';
 }
 
 function assertCanAccessAudit(
@@ -210,7 +225,85 @@ function firstDateText(
   return '-';
 }
 
+function boolFromUnknown(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'sim';
+  }
+  if (typeof value === 'number') return value !== 0;
+  return false;
+}
+
+function weightedScore(compliantWeight: number, evaluatedWeight: number): number {
+  if (evaluatedWeight <= 0) return 0;
+  return Number(((compliantWeight / evaluatedWeight) * 100).toFixed(1));
+}
+
+function calculateResponsibleScores(
+  answers: AnswerData[],
+  questions: QueryDocumentSnapshot[],
+  operatorQuestionPaths: Set<string>
+): { operatorScore: number; clientScore: number } {
+  const questionsByPath = new Map(
+    toQuestionsWithOrder(questions).map((question) => [question.path, question])
+  );
+
+  let operatorEvaluatedWeight = 0;
+  let operatorCompliantWeight = 0;
+  let clientEvaluatedWeight = 0;
+  let clientCompliantWeight = 0;
+
+  for (const answer of answers) {
+    const response = responseFromAnswer(answer);
+    if (response !== 'compliant' && response !== 'non_compliant') continue;
+
+    const questionPath = questionPathFromAnswer(answer);
+    const questionWeight = questionPath == null ? 1 : (questionsByPath.get(questionPath)?.weight ?? 1);
+    const belongsToOperator = questionPath != null && operatorQuestionPaths.has(questionPath);
+
+    if (belongsToOperator) {
+      operatorEvaluatedWeight += questionWeight;
+      if (response === 'compliant') operatorCompliantWeight += questionWeight;
+    } else {
+      clientEvaluatedWeight += questionWeight;
+      if (response === 'compliant') clientCompliantWeight += questionWeight;
+    }
+  }
+
+  return {
+    operatorScore: weightedScore(operatorCompliantWeight, operatorEvaluatedWeight),
+    clientScore: weightedScore(clientCompliantWeight, clientEvaluatedWeight)
+  };
+}
+
+function buildScoreBars(items: Array<{ name: string; score: number }>): string {
+  return items
+    .map((item) => {
+      const score = Number(item.score.toFixed(1));
+      const cls = score >= 80 ? 'bar-good' : 'bar-bad';
+      return `<div class="category-bar-row">
+        <div class="category-bar-head">
+          <span class="category-name">${escapeHtml(item.name)}</span>
+          <span class="category-value">${score.toFixed(1)}%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill ${cls}" style="width:${Math.max(0, Math.min(100, score)).toFixed(1)}%"></div>
+        </div>
+      </div>`;
+    })
+    .join('');
+}
+
 async function buildPdfFromHtml(html: string): Promise<Buffer> {
+  const normalizedHtml = html.toUpperCase();
+  if (!normalizedHtml.includes(PDF_ENCODING_SENTINEL)) {
+    console.error('[generateAuditPdf] encoding sentinel inválido', {
+      expected: PDF_ENCODING_SENTINEL
+    });
+    throw new Error('Template HTML com encoding inválido (UTF-8 corrompido).');
+  }
+
   const executablePath = await chromium.executablePath();
   const browser = await playwrightChromium.launch({
     executablePath,
@@ -240,18 +333,66 @@ function photoMime(pathValue: string): string {
   return 'image/jpeg';
 }
 
-async function photoDataUri(storagePath: string): Promise<string | null> {
+async function photoDataUri(storagePath: string): Promise<ProcessedPhotoResult> {
   try {
     const file = getStorage().bucket().file(storagePath);
     const [metadata] = await file.getMetadata();
-    const bytes = Number(metadata.size ?? 0);
-    if (Number.isFinite(bytes) && bytes > MAX_PHOTO_BYTES) {
-      return null;
+    const metadataBytes = Number(metadata.size ?? 0);
+    if (Number.isFinite(metadataBytes) && metadataBytes > MAX_INPUT_PHOTO_BYTES) {
+      return {
+        uri: null,
+        originalBytes: metadataBytes,
+        processedBytes: 0
+      };
     }
+
     const [buffer] = await file.download();
-    return `data:${photoMime(storagePath)};base64,${buffer.toString('base64')}`;
+    const originalBytes = buffer.length;
+    const mime = photoMime(storagePath);
+    const lowerPath = storagePath.toLowerCase();
+    const isPng = lowerPath.endsWith('.png');
+
+    let optimizedBuffer: Buffer = buffer;
+    let outputMime = mime;
+    try {
+      const transformed = await sharp(buffer, { failOn: 'none' })
+        .rotate()
+        .resize({
+          width: IMAGE_MAX_WIDTH_PX,
+          withoutEnlargement: true,
+          fit: 'inside'
+        })
+        .jpeg({
+          quality: IMAGE_JPEG_QUALITY,
+          mozjpeg: true,
+          chromaSubsampling: '4:2:0'
+        })
+        .toBuffer();
+
+      // Keep PNG only when it is materially smaller than optimized JPEG.
+      if (isPng && buffer.length + 2048 < transformed.length) {
+        optimizedBuffer = buffer;
+        outputMime = 'image/png';
+      } else {
+        optimizedBuffer = transformed;
+        outputMime = 'image/jpeg';
+      }
+    } catch {
+      optimizedBuffer = buffer;
+      outputMime = mime;
+    }
+
+    return {
+      uri: `data:${outputMime};base64,${optimizedBuffer.toString('base64')}`,
+      originalBytes,
+      processedBytes: optimizedBuffer.length
+    };
   } catch {
-    return null;
+    return {
+      uri: null,
+      originalBytes: 0,
+      processedBytes: 0
+    };
   }
 }
 
@@ -301,22 +442,20 @@ async function renderHtmlTemplate(input: {
   inter700: string;
   inter800: string;
   clientName: string;
-  companyName: string;
-  restaurantOperator: string;
   auditDate: string;
-  companyContact: string;
   auditAddress: string;
+  operatorName: string;
   auditorName: string;
-  technicalReviewer: string;
   openingDate: string;
   auditCode: string;
-  auditStatus: string;
   issuedAt: string;
   overallScore: number;
   overallClassification: string;
   totalEvaluatedItems: number;
   nonCompliantCount: number;
-  categoryRows: string;
+  categoryBarTrackColor: string;
+  categoryBars: string;
+  responsibleBars: string;
   nonComplianceRows: string;
   checklistRows: string;
 }): Promise<string> {
@@ -334,22 +473,20 @@ async function renderHtmlTemplate(input: {
   html = replaceToken(html, '{{INTER_700_WOFF2}}', input.inter700);
   html = replaceToken(html, '{{INTER_800_WOFF2}}', input.inter800);
   html = replaceToken(html, '{{CLIENT_NAME}}', escapeHtml(input.clientName));
-  html = replaceToken(html, '{{COMPANY_NAME}}', escapeHtml(input.companyName));
-  html = replaceToken(html, '{{RESTAURANT_OPERATOR}}', escapeHtml(input.restaurantOperator));
   html = replaceToken(html, '{{AUDIT_DATE}}', escapeHtml(input.auditDate));
-  html = replaceToken(html, '{{COMPANY_CONTACT}}', escapeHtml(input.companyContact));
   html = replaceToken(html, '{{AUDIT_ADDRESS}}', escapeHtml(input.auditAddress));
+  html = replaceToken(html, '{{OPERATOR_NAME}}', escapeHtml(input.operatorName));
   html = replaceToken(html, '{{AUDITOR_NAME}}', escapeHtml(input.auditorName));
-  html = replaceToken(html, '{{TECHNICAL_REVIEWER}}', escapeHtml(input.technicalReviewer));
   html = replaceToken(html, '{{OPENING_DATE}}', escapeHtml(input.openingDate));
   html = replaceToken(html, '{{AUDIT_CODE}}', escapeHtml(input.auditCode));
-  html = replaceToken(html, '{{AUDIT_STATUS}}', escapeHtml(input.auditStatus));
   html = replaceToken(html, '{{ISSUED_AT}}', escapeHtml(input.issuedAt));
   html = replaceToken(html, '{{OVERALL_SCORE}}', input.overallScore.toFixed(1));
   html = replaceToken(html, '{{OVERALL_CLASSIFICATION}}', escapeHtml(input.overallClassification));
   html = replaceToken(html, '{{TOTAL_EVALUATED_ITEMS}}', String(input.totalEvaluatedItems));
   html = replaceToken(html, '{{NON_COMPLIANT_COUNT}}', String(input.nonCompliantCount));
-  html = replaceToken(html, '{{CATEGORY_ROWS}}', input.categoryRows);
+  html = replaceToken(html, '{{CATEGORY_BAR_TRACK_COLOR}}', input.categoryBarTrackColor);
+  html = replaceToken(html, '{{CATEGORY_BARS}}', input.categoryBars);
+  html = replaceToken(html, '{{RESPONSIBLE_BARS}}', input.responsibleBars);
   html = replaceToken(html, '{{NON_COMPLIANCE_ROWS}}', input.nonComplianceRows);
   html = replaceToken(html, '{{CHECKLIST_ROWS}}', input.checklistRows);
   return html;
@@ -445,11 +582,27 @@ export const generateAuditPdf = onCall(
 
       let clientData: Record<string, unknown> | undefined;
       let clientName = '-';
+      let operatorName = '-';
+      const operatorQuestionPaths = new Set<string>();
       const clientRef = auditData['clientRef'] as DocumentReference | undefined;
       if (clientRef) {
         const clientSnapshot = await clientRef.get();
         clientData = (clientSnapshot.data() ?? {}) as Record<string, unknown>;
         clientName = firstText([clientData], ['name', 'clientName', 'razaoSocial']);
+
+        const hasOperator = boolFromUnknown(clientData['hasOperator']);
+        operatorName = hasOperator
+          ? firstText([clientData], ['operatorName', 'operator'])
+          : '-';
+
+        const responsibilityMap =
+          (clientData['responsibilityMap'] as Record<string, unknown> | undefined) ?? {};
+        for (const [questionPath, owner] of Object.entries(responsibilityMap)) {
+          if (typeof questionPath !== 'string' || questionPath.trim().length === 0) continue;
+          if (owner === 'operator') {
+            operatorQuestionPaths.add(questionPath);
+          }
+        }
       }
 
       let auditorData: Record<string, unknown> | undefined;
@@ -526,13 +679,23 @@ export const generateAuditPdf = onCall(
       const startedAt = asDate(auditData['startedAt']);
       const status = typeof auditData['status'] === 'string' ? auditData['status'] : '';
 
-      const categoryRows = sections
-        .map((section) => {
-          const score = calculateCategoryWeightedScore(section.path, questions, answers);
-          const cls = scoreClass(score);
-          return `<tr><td>${escapeHtml(section.name)}</td><td>${score.toFixed(1)}%</td><td class="${cls.className}">${cls.label}</td></tr>`;
-        })
-        .join('');
+      const categoryBars = buildScoreBars(
+        sections
+          .map((section) => ({
+            name: section.name,
+            score: calculateCategoryWeightedScore(section.path, questions, answers)
+          }))
+          .sort((a, b) => a.score - b.score)
+      );
+      const responsibleScores = calculateResponsibleScores(
+        answers,
+        questions,
+        operatorQuestionPaths
+      );
+      const responsibleBars = buildScoreBars([
+        { name: 'Operador', score: responsibleScores.operatorScore },
+        { name: 'Cliente', score: responsibleScores.clientScore }
+      ]);
 
       const sectionByPath = new Map(sections.map((section) => [section.path, section]));
       const questionOrder = toQuestionsWithOrder(
@@ -541,9 +704,14 @@ export const generateAuditPdf = onCall(
 
       const questionPhotoStats = new Map<string, QuestionPhotoStats>();
       const photoDownloadQueue: Array<{ questionPath: string; storagePath: string }> = [];
+      let originalImagesTotalBytes = 0;
+      let processedImagesTotalBytes = 0;
       for (const [questionPath, photoRecords] of photosByQuestionPath.entries()) {
         questionPhotoStats.set(questionPath, { uris: [], failedCount: 0 });
+        const seenStoragePaths = new Set<string>();
         for (const photo of photoRecords) {
+          if (seenStoragePaths.has(photo.path)) continue;
+          seenStoragePaths.add(photo.path);
           photoDownloadQueue.push({ questionPath, storagePath: photo.path });
         }
       }
@@ -553,11 +721,13 @@ export const generateAuditPdf = onCall(
         async ({ questionPath, storagePath }) => {
           const stats = questionPhotoStats.get(questionPath);
           if (!stats) return;
-          const photoUri = await photoDataUri(storagePath);
-          if (photoUri == null) {
+          const photo = await photoDataUri(storagePath);
+          originalImagesTotalBytes += photo.originalBytes;
+          processedImagesTotalBytes += photo.processedBytes;
+          if (photo.uri == null) {
             stats.failedCount += 1;
           } else {
-            stats.uris.push(photoUri);
+            stats.uris.push(photo.uri);
           }
         }
       );
@@ -572,6 +742,7 @@ export const generateAuditPdf = onCall(
 
         checklistItems.push({
           order: question.order,
+          categoryName: sectionByPath.get(question.categoryPath)?.name ?? '-',
           description: question.text,
           status: statusLabel,
           statusClass: statusCss
@@ -623,8 +794,6 @@ export const generateAuditPdf = onCall(
                   <h3>Categoria: ${escapeHtml(item.categoryName)} - Questão ${item.order}</h3>
                   <div class="label">Descrição da Pergunta:</div>
                   <div class="value">${escapeHtml(item.questionText)}</div>
-                  <div class="label">Status:</div>
-                  <div class="value status-bad">${escapeHtml(item.status)}</div>
                   <div class="label">Responsável:</div>
                   <div class="value">${escapeHtml(item.responsible)}</div>
                   <div class="label">Descrição da Auditora:</div>
@@ -638,7 +807,7 @@ export const generateAuditPdf = onCall(
       const checklistRows = checklistItems
         .map(
           (item) =>
-            `<tr><td>${item.order}</td><td>${escapeHtml(item.description)}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`
+            `<tr><td>${item.order}</td><td>${escapeHtml(item.categoryName)}</td><td>${escapeHtml(item.description)}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`
         )
         .join('');
 
@@ -663,37 +832,15 @@ export const generateAuditPdf = onCall(
         fontBase64OrEmpty(FONT_800_FILE)
       ]);
 
-      const companyName = firstText([auditData, clientData], [
-        'companyName',
-        'company',
-        'empresa',
-        'name'
-      ]);
-      const restaurantOperator = firstText([auditData, clientData], [
-        'restaurantOperator',
-        'operator',
-        'operadora',
-        'operadoraRestaurante'
-      ]);
-      const companyContact = firstText([auditData, clientData], [
-        'companyContact',
-        'contact',
-        'responsavel',
-        'contactName'
-      ]);
       const auditAddress = firstText([auditData, clientData], [
-        'auditAddress',
         'address',
+        'auditAddress',
         'endereco'
       ]);
-      const technicalReviewer = firstText([auditData, clientData], [
-        'technicalReviewer',
-        'revisaoTecnica',
-        'responsavelTecnico'
-      ]);
-      const openingDate = firstDateText([auditData, clientData], [
+      const openingDate = firstDateText([clientData], [
+        'inauguration',
+        'inaugurationDate',
         'openingDate',
-        'inauguracao',
         'openedAt'
       ]);
       const overallClassification = scoreClass(overallScore).label.toUpperCase();
@@ -708,22 +855,20 @@ export const generateAuditPdf = onCall(
         inter700,
         inter800,
         clientName: toDisplay(clientName),
-        companyName: toDisplay(companyName),
-        restaurantOperator: toDisplay(restaurantOperator),
         auditDate: datePtBr(startedAt),
-        companyContact: toDisplay(companyContact),
         auditAddress: toDisplay(auditAddress),
+        operatorName: toDisplay(operatorName),
         auditorName: toDisplay(auditorName),
-        technicalReviewer: toDisplay(technicalReviewer),
         openingDate: toDisplay(openingDate),
         auditCode: toDisplay(auditCode),
-        auditStatus: ptBrStatus(status),
         issuedAt: datePtBr(new Date()),
         overallScore,
         overallClassification,
         totalEvaluatedItems,
         nonCompliantCount,
-        categoryRows,
+        categoryBarTrackColor: PDF_CATEGORY_BAR_TRACK_COLOR,
+        categoryBars,
+        responsibleBars,
         nonComplianceRows,
         checklistRows
       });
@@ -780,6 +925,8 @@ export const generateAuditPdf = onCall(
       const pdfSizeBytes = pdfBuffer.length;
       console.info('[generateAuditPdf] perf', {
         fetchFirestoreMs,
+        originalImagesTotalBytes,
+        processedImagesTotalBytes,
         imageDownloadMs,
         renderHtmlMs,
         renderPdfMs,

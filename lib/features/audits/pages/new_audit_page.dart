@@ -166,11 +166,14 @@ class _NewAuditPageState extends State<NewAuditPage> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initialDate = _chosenDate.isAfter(today) ? today : _chosenDate;
     final picked = await showDatePicker(
       context: context,
-      initialDate: _chosenDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 3650)),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      initialDate: initialDate,
+      firstDate: today.subtract(const Duration(days: 3650)),
+      lastDate: today,
       locale: const Locale('pt', 'BR'),
     );
 

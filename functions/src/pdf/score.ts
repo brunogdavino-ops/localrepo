@@ -22,6 +22,12 @@ export interface OrderedCategorySection {
   questions: QuestionWithOrder[];
 }
 
+export function formatCategoryName(raw: string): string {
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) return raw.trim();
+  return `${normalized[0].toUpperCase()}${normalized.slice(1)}`;
+}
+
 export function questionPathFromAnswer(answer: AnswerData): string | null {
   const questionRef = answer['questionRef'] as DocRef;
   return questionRef?.path ?? null;
@@ -129,8 +135,9 @@ export function buildOrderedSections(
     categoriesByPath.set(category.ref.path, {
       id: category.id,
       path: category.ref.path,
-      name: typeof data.name === 'string' && data.name.trim().length > 0
-          ? data.name.trim()
+      name:
+        typeof data.name === 'string' && data.name.trim().length > 0
+          ? formatCategoryName(data.name)
           : 'Sem categoria',
       order: typeof data.order === 'number' ? data.order : 999999
     });
@@ -150,7 +157,7 @@ export function buildOrderedSections(
     const category = categoriesByPath.get(categoryPath) ?? {
       id: categoryPath,
       path: categoryPath,
-      name: 'Sem categoria',
+      name: formatCategoryName('Sem categoria'),
       order: 999999
     };
     sections.push({

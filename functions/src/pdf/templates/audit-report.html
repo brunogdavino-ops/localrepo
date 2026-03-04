@@ -49,14 +49,15 @@
       --line: #e5e7eb;
       --bg: #f6f5f5;
       --good: #16a34a;
-      --regular: #f59e0b;
       --bad: #dc2626;
+      --na: #6b7280;
+      --not-observed: #d4a106;
       --paper: #ffffff;
     }
 
     @page {
       size: A4;
-      margin: 0;
+      margin: 24px 28px 24px 28px;
     }
 
     * {
@@ -67,29 +68,39 @@
 
     html,
     body {
-      width: 210mm;
-      min-height: 297mm;
-      background: #f0f0f0;
       color: var(--text);
       font-family: "Inter", "Segoe UI", Arial, sans-serif;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
       line-height: 1.45;
       font-size: 12px;
+      background: var(--paper);
     }
 
     .page {
-      width: 210mm;
-      min-height: 297mm;
+      width: 100%;
       background: var(--paper);
-      padding: 0;
+      padding-top: 2px;
+      padding-bottom: 48px;
+    }
+
+    .page-footer-global {
+      position: fixed;
+      left: 28px;
+      right: 28px;
+      bottom: 0;
+      text-align: center;
+      font-size: 10px;
+      color: #bfbfbf;
+      background: transparent;
+      padding: 4px 0 2px;
     }
 
     .brand-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      padding: 8mm 10mm 6mm;
+      padding: 20px 20px 16px;
       background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.08) 100%),
         #1e212f;
@@ -99,7 +110,7 @@
     }
 
     .brand-header img {
-      width: 35mm;
+      width: 132px;
       height: auto;
       object-fit: contain;
       display: block;
@@ -118,17 +129,21 @@
       width: 100%;
       border: 1px solid var(--line);
       border-top: none;
-      padding: 9mm;
+      padding: 20px;
       background: var(--paper);
+      box-sizing: border-box;
+      overflow: visible;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
 
     .header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 10mm;
-      padding-bottom: 5mm;
-      margin-bottom: 6mm;
+      gap: 36px;
+      padding-bottom: 18px;
+      margin-bottom: 18px;
       border-bottom: 1px solid var(--line);
       page-break-inside: avoid;
       break-inside: avoid;
@@ -144,12 +159,21 @@
       font-weight: 800;
       color: var(--brand);
       letter-spacing: 0.2px;
-      margin-bottom: 3mm;
+      margin-bottom: 12px;
       text-transform: uppercase;
     }
 
+    .header-info h1 {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-style: normal;
+      font-kerning: normal;
+      font-feature-settings: "kern" 1, "liga" 1;
+      text-rendering: geometricPrecision;
+    }
+
     .header-info p {
-      margin-top: 1.6mm;
+      margin-top: 6px;
       font-size: 12px;
       color: var(--muted);
     }
@@ -160,7 +184,7 @@
     }
 
     .header-logo {
-      width: 44mm;
+      width: 168px;
       flex-shrink: 0;
     }
 
@@ -171,12 +195,12 @@
       object-fit: contain;
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 3mm;
+      padding: 8px;
       background: #fff;
     }
 
     .score-box {
-      margin: 2mm 0 6mm;
+      margin: 4px 0 18px;
       page-break-inside: avoid;
       break-inside: avoid;
     }
@@ -189,22 +213,23 @@
     }
 
     .classificacao {
-      margin-top: 1.6mm;
+      margin-top: 6px;
       font-size: 14px;
       font-weight: 700;
       color: var(--brand);
     }
 
-    .footer-info {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2mm;
+    .section {
+      margin-top: 24px;
+      page-break-inside: auto;
+      break-inside: auto;
     }
 
-    .section {
-      margin-top: 8mm;
+    .section.keep-whole {
       page-break-inside: avoid;
-      break-inside: avoid;
+      break-inside: avoid-page;
+      page-break-before: auto;
+      break-before: auto;
     }
 
     .section h2 {
@@ -212,8 +237,10 @@
       color: var(--brand);
       font-weight: 700;
       border-bottom: 2px solid var(--line);
-      padding-bottom: 1.8mm;
-      margin-bottom: 4mm;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .summary-list {
@@ -225,6 +252,54 @@
     .summary-list strong {
       font-weight: 600;
     }
+
+    .category-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
+    .category-bar-row {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .category-bar-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .category-name {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .category-value {
+      color: var(--brand);
+      font-weight: 700;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 10px;
+      background: {{CATEGORY_BAR_TRACK_COLOR}};
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid #e2e2ee;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+    }
+
+    .bar-fill.bar-good { background: var(--good); }
+    .bar-fill.bar-bad { background: var(--bad); }
 
     table {
       width: 100%;
@@ -247,7 +322,8 @@
       border-bottom: 1px solid var(--line);
       text-align: left;
       vertical-align: top;
-      padding: 2.2mm 2mm;
+      padding: 10px 6px;
+      line-height: 1.35;
       word-break: break-word;
     }
 
@@ -257,71 +333,86 @@
       font-weight: 700;
     }
 
-    .status-good {
-      color: var(--good);
-      font-weight: 600;
+    .status-good { color: var(--good); font-weight: 600; }
+    .status-bad { color: var(--bad); font-weight: 600; }
+    .status-na { color: var(--na); font-weight: 600; }
+    .status-not-observed { color: var(--not-observed); font-weight: 600; }
+    .status-muted { color: var(--muted); font-weight: 600; }
+
+    .checklist-table col.question-col {
+      width: 9%;
     }
 
-    .status-regular {
-      color: var(--regular);
-      font-weight: 600;
+    .checklist-table col.category-col {
+      width: 24%;
     }
 
-    .status-bad {
-      color: var(--bad);
-      font-weight: 600;
+    .checklist-table col.description-col {
+      width: 51%;
+    }
+
+    .checklist-table col.status-col {
+      width: 16%;
+    }
+
+    .checklist-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     .nonconform {
       border: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
       border-radius: 10px;
-      padding: 4mm;
-      margin-bottom: 4mm;
+      padding: 12px;
+      margin-bottom: 12px;
       page-break-inside: avoid;
       break-inside: avoid;
+      display: block;
+      box-sizing: border-box;
     }
 
     .nonconform h3 {
       color: var(--brand);
       font-size: 13px;
       font-weight: 700;
-      margin-bottom: 1.5mm;
+      margin-bottom: 4px;
     }
 
     .label {
-      margin-top: 1.2mm;
+      margin-top: 4px;
       font-size: 12px;
       font-weight: 600;
       color: var(--text);
     }
 
     .value {
-      margin-top: 0.8mm;
+      margin-top: 2px;
       font-size: 12px;
       color: var(--muted);
     }
 
     .photos {
-      margin-top: 2mm;
+      margin-top: 8px;
       display: flex;
       flex-wrap: wrap;
-      gap: 2mm;
+      gap: 6px;
     }
 
     .photo-item {
-      width: 58mm;
-      min-height: 36mm;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 1.2mm;
-      background: #fff;
+      width: 220px;
+      min-height: 0;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
     .photo-item img {
       width: 100%;
-      max-height: 50mm;
+      max-height: 180px;
       display: block;
       object-fit: contain;
       border-radius: 6px;
@@ -331,16 +422,14 @@
     .empty-box {
       border: 1px dashed var(--line);
       border-radius: 8px;
-      padding: 3mm;
+      padding: 10px;
       color: var(--muted);
       font-size: 11px;
       text-align: center;
       background: #fff;
     }
 
-    .photo-empty {
-      width: 58mm;
-    }
+    .photo-empty { width: 220px; }
 
     .conclusion {
       font-size: 13px;
@@ -351,12 +440,12 @@
     .normative {
       font-size: 11px;
       color: var(--muted);
-      margin-top: 4mm;
+      margin-top: 12px;
     }
 
     .institutional-footer {
-      margin-top: 10mm;
-      padding-top: 6mm;
+      margin-top: 24px;
+      padding-top: 14px;
       border-top: 1px solid var(--line);
       text-align: center;
       font-size: 10px;
@@ -366,8 +455,8 @@
     }
 
     .institutional-footer img {
-      width: 34mm;
-      margin-bottom: 4mm;
+      width: 130px;
+      margin-bottom: 8px;
       object-fit: contain;
     }
 
@@ -377,6 +466,7 @@
   </style>
 </head>
 <body>
+  <div class="page-footer-global">Artezi Consultoria em Segurança Alimentar</div>
   <div class="page">
     <div class="brand-header">
       <img src="{{ARTEZI_LOGO_DATA_URI}}" alt="Logo Artezi" />
@@ -388,16 +478,12 @@
         <div class="header-info">
           <h1 class="header-title">Relatório de Auditoria Sanitária</h1>
           <p><strong>Cliente:</strong> {{CLIENT_NAME}}</p>
-          <p><strong>Empresa:</strong> {{COMPANY_NAME}}</p>
-          <p><strong>Operadora do Restaurante:</strong> {{RESTAURANT_OPERATOR}}</p>
-          <p><strong>Data:</strong> {{AUDIT_DATE}}</p>
-          <p><strong>Contato empresa:</strong> {{COMPANY_CONTACT}}</p>
-          <p><strong>Endereço:</strong> {{AUDIT_ADDRESS}}</p>
+          <p><strong>Data da auditoria:</strong> {{AUDIT_DATE}}</p>
+          <p><strong>Endereço completo:</strong> {{AUDIT_ADDRESS}}</p>
+          <p><strong>Operadora:</strong> {{OPERATOR_NAME}}</p>
           <p><strong>Auditora:</strong> {{AUDITOR_NAME}}</p>
-          <p><strong>Revisão Técnica e Responsável:</strong> {{TECHNICAL_REVIEWER}}</p>
           <p><strong>Inauguração:</strong> {{OPENING_DATE}}</p>
-          <p><strong>Auditoria:</strong> {{AUDIT_CODE}}</p>
-          <p><strong>Status:</strong> {{AUDIT_STATUS}}</p>
+          <p><strong>Código de Auditoria:</strong> {{AUDIT_CODE}}</p>
         </div>
         <div class="header-logo">
           <img src="{{CLIENT_LOGO_DATA_URI}}" alt="Logo Cliente" />
@@ -407,7 +493,6 @@
       <section class="score-box">
         <div class="score">{{OVERALL_SCORE}}%</div>
         <div class="classificacao">Classificação: {{OVERALL_CLASSIFICATION}}</div>
-        <div class="footer-info">Artezi Consultoria em Segurança Alimentar</div>
       </section>
 
       <section class="section">
@@ -424,33 +509,38 @@
         </div>
       </section>
 
-      <section class="section">
+      <section class="section keep-whole">
         <h2>2. Desempenho por Categoria</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Categoria</th>
-              <th>Percentual</th>
-              <th>Classificação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{CATEGORY_ROWS}}
-          </tbody>
-        </table>
+        <div class="category-bars">
+          {{CATEGORY_BARS}}
+        </div>
+      </section>
+
+      <section class="section keep-whole">
+        <h2>3. Desempenho por Responsável</h2>
+        <div class="category-bars">
+          {{RESPONSIBLE_BARS}}
+        </div>
       </section>
 
       <section class="section">
-        <h2>3. Não Conformidades Identificadas</h2>
+        <h2>4. Não Conformidades Identificadas</h2>
         {{NON_COMPLIANCE_ROWS}}
       </section>
 
       <section class="section">
-        <h2>4. Checklist Consolidado</h2>
-        <table>
+        <h2>5. Checklist Consolidado</h2>
+        <table class="checklist-table">
+          <colgroup>
+            <col class="question-col" />
+            <col class="category-col" />
+            <col class="description-col" />
+            <col class="status-col" />
+          </colgroup>
           <thead>
             <tr>
               <th>Questão</th>
+              <th>Categoria</th>
               <th>Descrição</th>
               <th>Status</th>
             </tr>
@@ -462,7 +552,7 @@
       </section>
 
       <section class="section">
-        <h2>5. Conclusão Técnica</h2>
+        <h2>6. Conclusão Técnica</h2>
         <p class="conclusion">
           Com base na avaliação realizada, a unidade apresentou classificação
           <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas
@@ -480,16 +570,16 @@
         <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Logo Institucional" />
         <p><strong>Claudia Artezi</strong></p>
         <p>Responsável Técnica</p>
-        <p>Artezi Consultoria em Segurança Alimentar</p>
         <p>São Paulo - SP</p>
         <br />
-        <p>
-          Os direitos autorais deste documento pertencem às empresas Artezi e cliente auditado.
-          Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente,
-          sem autorização prévia e expressa.
-        </p>
+        <p>Os direitos autorais deste documento pertencem às empresas Artezi e ATAC. Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente, sem autorização prévia e expressa. Todos os direitos e marcas são devidamente reconhecidos.</p>
       </div>
     </div>
   </div>
 </body>
 </html>
+
+
+
+
+

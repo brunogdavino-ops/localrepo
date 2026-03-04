@@ -4,9 +4,12 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/audit_score_service.dart';
+import '../utils/category_name_formatter.dart';
 import '../widgets/artezi_answer_icon_button.dart';
 import '../widgets/artezi_progress_bar.dart';
 
@@ -23,6 +26,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _imagePicker = ImagePicker();
+  final AuditScoreService _auditScoreService = AuditScoreService();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -33,14 +37,18 @@ class _AuditFillPageState extends State<AuditFillPage> {
   final List<_CategorySection> _sections = [];
   final Map<String, String?> _responses = {};
   final Map<String, String> _notes = {};
-  final Map<String, DocumentReference<Map<String, dynamic>>> _answerDocByQuestion = {};
-  final Map<String, DocumentReference<Map<String, dynamic>>> _questionRefByQuestion = {};
-  final Map<String, DocumentReference<Map<String, dynamic>>> _categoryRefByQuestion = {};
+  final Map<String, DocumentReference<Map<String, dynamic>>>
+  _answerDocByQuestion = {};
+  final Map<String, DocumentReference<Map<String, dynamic>>>
+  _questionRefByQuestion = {};
+  final Map<String, DocumentReference<Map<String, dynamic>>>
+  _categoryRefByQuestion = {};
   final Map<String, TextEditingController> _noteControllers = {};
   final Map<String, Timer> _noteDebounce = {};
   final Map<String, int> _totalQuestionsByCategory = {};
   final Map<String, int> _answeredQuestionsByCategory = {};
   final Map<String, bool> _photoUploadingByQuestion = {};
+  final Set<String> _pendingNonCompliantQuestionIds = <String>{};
 
   static const Color _bgColor = Color(0xFFF6F5F5);
   static const Color _brandColor = Color(0xFF39306E);
@@ -49,7 +57,6 @@ class _AuditFillPageState extends State<AuditFillPage> {
   static const Color _lineColor = Color(0xFFE6E6EF);
   static const Color _chipBgColor = Color(0xFFECECF3);
   static const Color _chipBorderColor = Color(0xFFE2E2EE);
-  static const Color _primaryButton = Color(0xFF7262C2);
 
   TextStyle _inter({
     double? fontSize,
@@ -117,7 +124,9 @@ class _AuditFillPageState extends State<AuditFillPage> {
           clientName = client;
         }
       }
-      _headerTitle = clientName == null ? defaultTitle : 'Auditoria: $clientName';
+      _headerTitle = clientName == null
+          ? defaultTitle
+          : 'Auditoria: $clientName';
 
       final categoriesSnapshot = await _firestore
           .collection('categories')
@@ -140,12 +149,18 @@ class _AuditFillPageState extends State<AuditFillPage> {
         final order = (data['order'] as num?)?.toInt() ?? 999999;
         categoriesByPath[doc.reference.path] = _CategoryMeta(
           id: doc.id,
-          name: (name == null || name.isEmpty) ? 'Sem categoria' : name,
+          name: (name == null || name.isEmpty)
+              ? 'Sem categoria'
+              : formatCategoryName(name),
           order: order,
         );
       }
-      debugPrint('AuditFillPage: categories loaded = ${categoriesSnapshot.docs.length}');
-      debugPrint('AuditFillPage: questions loaded = ${questionsSnapshot.docs.length}');
+      debugPrint(
+        'AuditFillPage: categories loaded = ${categoriesSnapshot.docs.length}',
+      );
+      debugPrint(
+        'AuditFillPage: questions loaded = ${questionsSnapshot.docs.length}',
+      );
 
       _responses.clear();
       _notes.clear();
@@ -161,9 +176,11 @@ class _AuditFillPageState extends State<AuditFillPage> {
         if (questionRef == null) continue;
 
         final questionId = questionRef.id;
-        _responses[questionId] = (data['response'] as String?) ?? (data['value'] as String?);
+        _responses[questionId] =
+            (data['response'] as String?) ?? (data['value'] as String?);
         _notes[questionId] =
-            ((data['notes'] as String?) ?? (data['comment'] as String?) ?? '').trim();
+            ((data['notes'] as String?) ?? (data['comment'] as String?) ?? '')
+                .trim();
         _answerDocByQuestion[questionId] = answerDoc.reference;
       }
 
@@ -212,9 +229,15 @@ class _AuditFillPageState extends State<AuditFillPage> {
 
       final sectionEntries = grouped.entries.map((entry) {
         final categoryPath = entry.key;
-        final questions = entry.value..sort((a, b) => a.order.compareTo(b.order));
-        final meta = categoriesByPath[categoryPath] ??
-            _CategoryMeta(id: categoryPath, name: 'Sem categoria', order: 999999);
+        final questions = entry.value
+          ..sort((a, b) => a.order.compareTo(b.order));
+        final meta =
+            categoriesByPath[categoryPath] ??
+            _CategoryMeta(
+              id: categoryPath,
+              name: 'Sem categoria',
+              order: 999999,
+            );
         return _CategorySection(
           id: meta.id,
           categoryPath: categoryPath,
@@ -222,8 +245,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
           order: meta.order,
           questions: questions,
         );
-      }).toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
+      }).toList()..sort((a, b) => a.order.compareTo(b.order));
 
       if (!mounted) return;
       setState(() {
@@ -250,25 +272,10 @@ class _AuditFillPageState extends State<AuditFillPage> {
     return value != null && value.isNotEmpty;
   }
 
-  int get _totalQuestions {
-    return _sections.fold<int>(0, (total, section) => total + section.questions.length);
-  }
-
-  int get _answeredQuestions {
-    int count = 0;
-    for (final section in _sections) {
-      for (final question in section.questions) {
-        if (_isAnswered(_responses[question.id])) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
-
   _CategorySection? get _selectedSection {
     if (_sections.isEmpty) return null;
-    if (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= _sections.length) {
+    if (_selectedCategoryIndex < 0 ||
+        _selectedCategoryIndex >= _sections.length) {
       return _sections.first;
     }
     return _sections[_selectedCategoryIndex];
@@ -276,7 +283,9 @@ class _AuditFillPageState extends State<AuditFillPage> {
 
   double _progressForSection(_CategorySection? section) {
     if (section == null || section.questions.isEmpty) return 0;
-    final answered = section.questions.where((q) => _isAnswered(_responses[q.id])).length;
+    final answered = section.questions
+        .where((q) => _isAnswered(_responses[q.id]))
+        .length;
     return answered / section.questions.length;
   }
 
@@ -284,6 +293,17 @@ class _AuditFillPageState extends State<AuditFillPage> {
     final total = _totalQuestionsByCategory[categoryPath] ?? 0;
     final answered = _answeredQuestionsByCategory[categoryPath] ?? 0;
     return total > 0 && answered == total;
+  }
+
+  bool get _isAllCategoriesComplete {
+    if (_sections.isEmpty) return false;
+    return _sections.every((section) => _isCategoryComplete(section.categoryPath));
+  }
+
+  bool get _canAdvanceCurrentCategory {
+    final selected = _selectedSection;
+    if (selected == null) return false;
+    return _isCategoryComplete(selected.categoryPath);
   }
 
   void _rebuildCategoryStats() {
@@ -296,11 +316,14 @@ class _AuditFillPageState extends State<AuditFillPage> {
         }
       }
       _answeredQuestionsByCategory[section.categoryPath] = answered;
-      _totalQuestionsByCategory[section.categoryPath] = section.questions.length;
+      _totalQuestionsByCategory[section.categoryPath] =
+          section.questions.length;
     }
   }
 
-  Future<DocumentReference<Map<String, dynamic>>> _ensureAnswerRef(String questionId) async {
+  Future<DocumentReference<Map<String, dynamic>>> _ensureAnswerRef(
+    String questionId,
+  ) async {
     final existing = _answerDocByQuestion[questionId];
     if (existing != null) return existing;
 
@@ -373,7 +396,8 @@ class _AuditFillPageState extends State<AuditFillPage> {
 
       final answerRef = await _ensureAnswerRef(questionId);
       final photoDoc = answerRef.collection('photos').doc();
-      final filePath = 'audit_photos/${widget.auditId}/${answerRef.id}/${photoDoc.id}.jpg';
+      final filePath =
+          'audit_photos/${widget.auditId}/${answerRef.id}/${photoDoc.id}.jpg';
       final storageRef = _storage.ref().child(filePath);
       final file = File(picked.path);
 
@@ -397,9 +421,9 @@ class _AuditFillPageState extends State<AuditFillPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Falha ao anexar foto.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falha ao anexar foto.')));
     } finally {
       if (mounted) {
         setState(() {
@@ -426,9 +450,9 @@ class _AuditFillPageState extends State<AuditFillPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Falha ao remover foto.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falha ao remover foto.')));
     }
   }
 
@@ -444,10 +468,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
                 child: InteractiveViewer(
                   minScale: 0.8,
                   maxScale: 4,
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                  ),
+                  child: Image.network(url, fit: BoxFit.contain),
                 ),
               ),
               Positioned(
@@ -456,9 +477,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
                 child: IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, color: Colors.white),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black54,
-                  ),
+                  style: IconButton.styleFrom(backgroundColor: Colors.black54),
                 ),
               ),
             ],
@@ -499,7 +518,8 @@ class _AuditFillPageState extends State<AuditFillPage> {
 
                 return GestureDetector(
                   onTap: () => _openPhotoPreview(url),
-                  onLongPress: () => _deletePhoto(questionId: questionId, photoDoc: photoDoc),
+                  onLongPress: () =>
+                      _deletePhoto(questionId: questionId, photoDoc: photoDoc),
                   child: Stack(
                     children: [
                       ClipRRect(
@@ -507,17 +527,17 @@ class _AuditFillPageState extends State<AuditFillPage> {
                         child: SizedBox(
                           width: 56,
                           height: 56,
-                          child: Image.network(
-                            url,
-                            fit: BoxFit.cover,
-                          ),
+                          child: Image.network(url, fit: BoxFit.cover),
                         ),
                       ),
                       Positioned(
                         top: 2,
                         right: 2,
                         child: GestureDetector(
-                          onTap: () => _deletePhoto(questionId: questionId, photoDoc: photoDoc),
+                          onTap: () => _deletePhoto(
+                            questionId: questionId,
+                            photoDoc: photoDoc,
+                          ),
                           child: Container(
                             width: 18,
                             height: 18,
@@ -551,10 +571,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
     );
   }
 
-  void _queueNoteSave({
-    required String questionId,
-    required String text,
-  }) {
+  void _queueNoteSave({required String questionId, required String text}) {
     _notes[questionId] = text;
     _noteDebounce[questionId]?.cancel();
     _noteDebounce[questionId] = Timer(const Duration(milliseconds: 450), () {
@@ -594,9 +611,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
         _answerDocByQuestion[questionId] = newAnswerRef;
       }
 
-      await auditRef.update({
-        'updated_at': FieldValue.serverTimestamp(),
-      });
+      await auditRef.update({'updated_at': FieldValue.serverTimestamp()});
     } catch (_) {
       if (!mounted) return;
       _notes[questionId] = previous;
@@ -647,9 +662,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
         _answerDocByQuestion[questionId] = newAnswerRef;
       }
 
-      await auditRef.update({
-        'updated_at': FieldValue.serverTimestamp(),
-      });
+      await auditRef.update({'updated_at': FieldValue.serverTimestamp()});
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -665,6 +678,41 @@ class _AuditFillPageState extends State<AuditFillPage> {
   Future<void> _submitForValidation() async {
     if (_isSubmitting) return;
 
+    final pendingIssues = await _collectNonCompliantPendingIssues();
+    if (pendingIssues.isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _pendingNonCompliantQuestionIds
+          ..clear()
+          ..addAll(pendingIssues.map((issue) => issue.questionId));
+      });
+
+      final examples = pendingIssues
+          .take(3)
+          .map((issue) => 'Q${issue.order} (${issue.questionText})')
+          .join(', ');
+      final missingCommentCount = pendingIssues
+          .where((issue) => issue.missingComment)
+          .length;
+      final missingPhotoCount = pendingIssues
+          .where((issue) => issue.missingPhoto)
+          .length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Envio bloqueado: ${pendingIssues.length} inadequacao(oes) pendentes ($missingCommentCount sem comentario, $missingPhotoCount sem foto). Ex.: $examples',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (mounted && _pendingNonCompliantQuestionIds.isNotEmpty) {
+      setState(() {
+        _pendingNonCompliantQuestionIds.clear();
+      });
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -677,12 +725,37 @@ class _AuditFillPageState extends State<AuditFillPage> {
         'updated_at': FieldValue.serverTimestamp(),
       });
 
+      var scoreSyncFailed = false;
+      try {
+        await _auditScoreService.computeAndPersistScore(widget.auditId);
+      } on FirebaseFunctionsException catch (error) {
+        scoreSyncFailed = true;
+        debugPrint(
+          'computeAndPersistAuditScore failed (${error.code}): ${error.message}',
+        );
+      } catch (error) {
+        scoreSyncFailed = true;
+        debugPrint('computeAndPersistAuditScore unexpected failure: $error');
+      }
+
+      if (scoreSyncFailed && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Auditoria enviada, mas houve falha ao atualizar o score agora.',
+            ),
+          ),
+        );
+      }
+
       if (!mounted) return;
       Navigator.of(context).pop();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nao foi possivel enviar para validacao.')),
+        const SnackBar(
+          content: Text('Nao foi possivel enviar para validacao.'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -691,6 +764,101 @@ class _AuditFillPageState extends State<AuditFillPage> {
         });
       }
     }
+  }
+
+  Future<List<_NonCompliantPendingIssue>> _collectNonCompliantPendingIssues() async {
+    return _collectNonCompliantPendingIssuesForQuestions(
+      _sections.expand((section) => section.questions),
+    );
+  }
+
+  Future<List<_NonCompliantPendingIssue>> _collectNonCompliantPendingIssuesForQuestions(
+    Iterable<_QuestionItem> questions,
+  ) async {
+    final nonCompliantQuestions = questions
+        .where((question) => _responses[question.id] == 'non_compliant')
+        .toList(growable: false);
+
+    final pendingIssues = await Future.wait(
+      nonCompliantQuestions.map((question) async {
+        final noteValue = (_notes[question.id] ?? '').trim();
+        final missingComment = noteValue.isEmpty;
+        final answerRef = _answerDocByQuestion[question.id];
+        var hasPhoto = false;
+        if (answerRef != null) {
+          final photoSnapshot = await answerRef.collection('photos').limit(1).get();
+          hasPhoto = photoSnapshot.docs.isNotEmpty;
+        }
+        if (!missingComment && hasPhoto) {
+          return null;
+        }
+        return _NonCompliantPendingIssue(
+          questionId: question.id,
+          questionText: question.text,
+          order: question.order,
+          missingComment: missingComment,
+          missingPhoto: !hasPhoto,
+        );
+      }),
+    );
+
+    final result = pendingIssues
+        .whereType<_NonCompliantPendingIssue>()
+        .toList(growable: false);
+    result.sort((a, b) => a.order.compareTo(b.order));
+    return result;
+  }
+
+  int? _nextIncompleteCategoryIndex() {
+    for (int i = _selectedCategoryIndex + 1; i < _sections.length; i++) {
+      if (!_isCategoryComplete(_sections[i].categoryPath)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _handleSaveAndGoToNextCategory() async {
+    if (_isSubmitting || !_canAdvanceCurrentCategory) return;
+    final selected = _selectedSection;
+    if (selected == null) return;
+
+    final pendingCurrent = await _collectNonCompliantPendingIssuesForQuestions(
+      selected.questions,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _pendingNonCompliantQuestionIds
+        ..clear()
+        ..addAll(pendingCurrent.map((issue) => issue.questionId));
+    });
+
+    if (pendingCurrent.isNotEmpty) {
+      final examples = pendingCurrent
+          .take(3)
+          .map((issue) => 'Q${issue.order}')
+          .join(', ');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Aviso: existem inadequacoes sem comentario/foto nesta categoria (ex.: $examples).',
+          ),
+        ),
+      );
+    }
+
+    final nextIndex = _nextIncompleteCategoryIndex();
+    if (nextIndex != null) {
+      _selectCategory(nextIndex);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Todas as categorias foram concluídas.'),
+      ),
+    );
   }
 
   void _selectCategory(int index) {
@@ -713,8 +881,8 @@ class _AuditFillPageState extends State<AuditFillPage> {
       color: selected
           ? Colors.white
           : completed
-              ? completedColor
-              : _brandColor,
+          ? completedColor
+          : _brandColor,
     );
 
     return DecoratedBox(
@@ -728,14 +896,14 @@ class _AuditFillPageState extends State<AuditFillPage> {
         color: selected
             ? null
             : completed
-                ? completedColor.withValues(alpha: 0.14)
-                : _chipBgColor,
+            ? completedColor.withValues(alpha: 0.14)
+            : _chipBgColor,
         border: Border.all(
           color: selected
               ? Colors.transparent
               : completed
-                  ? completedColor.withValues(alpha: 0.22)
-                  : _chipBorderColor,
+              ? completedColor.withValues(alpha: 0.22)
+              : _chipBorderColor,
         ),
       ),
       child: Material(
@@ -756,10 +924,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
                   ),
                   const SizedBox(width: 6),
                 ],
-                Text(
-                  section.name,
-                  style: textStyle,
-                ),
+                Text(section.name, style: textStyle),
               ],
             ),
           ),
@@ -770,6 +935,8 @@ class _AuditFillPageState extends State<AuditFillPage> {
 
   Widget _buildQuestionItem(_QuestionItem question) {
     final controller = _controllerForQuestion(question.id);
+    final hasPendingNonCompliant =
+        _pendingNonCompliantQuestionIds.contains(question.id);
     final questionStyle = _inter(
       fontSize: 13,
       fontWeight: FontWeight.w600,
@@ -780,8 +947,15 @@ class _AuditFillPageState extends State<AuditFillPage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
+        color: hasPendingNonCompliant
+            ? const Color(0xFFDC2626).withValues(alpha: 0.04)
+            : null,
         border: Border(
-          bottom: BorderSide(color: _lineColor),
+          bottom: BorderSide(
+            color: hasPendingNonCompliant
+                ? const Color(0xFFDC2626).withValues(alpha: 0.20)
+                : _lineColor,
+          ),
         ),
       ),
       child: Column(
@@ -790,12 +964,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  question.text,
-                  style: questionStyle,
-                ),
-              ),
+              Expanded(child: Text(question.text, style: questionStyle)),
               const SizedBox(width: 12),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -806,7 +975,10 @@ class _AuditFillPageState extends State<AuditFillPage> {
                     selectedFillOpacity: 0.12,
                     selectedBorderOpacity: 0.20,
                     selected: _responses[question.id] == 'compliant',
-                    onTap: () => _setResponse(questionId: question.id, response: 'compliant'),
+                    onTap: () => _setResponse(
+                      questionId: question.id,
+                      response: 'compliant',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   ArteziAnswerIconButton(
@@ -815,8 +987,10 @@ class _AuditFillPageState extends State<AuditFillPage> {
                     selectedFillOpacity: 0.10,
                     selectedBorderOpacity: 0.18,
                     selected: _responses[question.id] == 'non_compliant',
-                    onTap: () =>
-                        _setResponse(questionId: question.id, response: 'non_compliant'),
+                    onTap: () => _setResponse(
+                      questionId: question.id,
+                      response: 'non_compliant',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   ArteziAnswerIconButton(
@@ -825,8 +999,10 @@ class _AuditFillPageState extends State<AuditFillPage> {
                     selectedFillOpacity: 0.10,
                     selectedBorderOpacity: 0.18,
                     selected: _responses[question.id] == 'not_applicable',
-                    onTap: () =>
-                        _setResponse(questionId: question.id, response: 'not_applicable'),
+                    onTap: () => _setResponse(
+                      questionId: question.id,
+                      response: 'not_applicable',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   ArteziAnswerIconButton(
@@ -835,7 +1011,10 @@ class _AuditFillPageState extends State<AuditFillPage> {
                     selectedFillOpacity: 0.10,
                     selectedBorderOpacity: 0.18,
                     selected: _responses[question.id] == 'not_observed',
-                    onTap: () => _setResponse(questionId: question.id, response: 'not_observed'),
+                    onTap: () => _setResponse(
+                      questionId: question.id,
+                      response: 'not_observed',
+                    ),
                   ),
                 ],
               ),
@@ -849,8 +1028,10 @@ class _AuditFillPageState extends State<AuditFillPage> {
                   height: 36,
                   child: TextField(
                     controller: controller,
-                    onChanged: (value) => _queueNoteSave(questionId: question.id, text: value),
-                    onSubmitted: (value) => _setNote(questionId: question.id, note: value),
+                    onChanged: (value) =>
+                        _queueNoteSave(questionId: question.id, text: value),
+                    onSubmitted: (value) =>
+                        _setNote(questionId: question.id, note: value),
                     style: _inter(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
@@ -858,13 +1039,13 @@ class _AuditFillPageState extends State<AuditFillPage> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'Comentar',
-                      hintStyle: _inter(
-                        fontSize: 12.5,
-                        color: _mutedColor,
-                      ),
+                      hintStyle: _inter(fontSize: 12.5, color: _mutedColor),
                       filled: true,
                       fillColor: Colors.white.withValues(alpha: 0.96),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
@@ -901,6 +1082,17 @@ class _AuditFillPageState extends State<AuditFillPage> {
             ],
           ),
           _buildPhotosStrip(question.id),
+          if (hasPendingNonCompliant) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Para inadequado: comentario e ao menos 1 foto sao obrigatorios.',
+              style: _inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFFDC2626),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -917,82 +1109,92 @@ class _AuditFillPageState extends State<AuditFillPage> {
       fontWeight: FontWeight.w500,
     );
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-            children: [
-              Row(
+    return CustomScrollView(
+      slivers: [
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _StickyAuditHeaderDelegate(
+            minExtentValue: 96,
+            maxExtentValue: 96,
+            child: Container(
+              color: _bgColor,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: ArteziProgressBar(
-                      progress: _totalQuestions == 0 ? 0 : _answeredQuestions / _totalQuestions,
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        for (int i = 0; i < _sections.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          _buildCategoryChip(
+                            section: _sections[i],
+                            selected: i == _selectedCategoryIndex,
+                            onTap: () => _selectCategory(i),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '${((_totalQuestions == 0 ? 0 : _answeredQuestions / _totalQuestions) * 100).round()}% concluido',
-                    style: headerTextStyle,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
+                  const SizedBox(height: 10),
+                  Row(
                     children: [
-                      for (int i = 0; i < _sections.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        _buildCategoryChip(
-                          section: _sections[i],
-                          selected: i == _selectedCategoryIndex,
-                          onTap: () => _selectCategory(i),
-                        ),
-                      ],
+                      Expanded(
+                        child: ArteziProgressBar(progress: selectedProgress),
+                      ),
+                      const SizedBox(width: 10),
+                      Text('$selectedPercent% concluido', style: headerTextStyle),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: ArteziProgressBar(progress: selectedProgress),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '$selectedPercent% concluido',
-                    style: headerTextStyle,
-                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              if (selectedSection == null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 28),
-                  child: Text(
-                    'Nenhuma pergunta encontrada para esta auditoria.',
-                    style: _inter(fontSize: 13, color: _mutedColor),
-                  ),
-                )
-              else
-                ...selectedSection.questions.map(_buildQuestionItem),
-            ],
+            ),
           ),
         ),
+        if (selectedSection == null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
+              child: Text(
+                'Nenhuma pergunta encontrada para esta auditoria.',
+                style: _inter(fontSize: 13, color: _mutedColor),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final question = selectedSection.questions[index];
+                return _buildQuestionItem(question);
+              }, childCount: selectedSection.questions.length),
+            ),
+          ),
       ],
+    );
+  }
+
+  void _showSaveProgressSnack() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Progresso salvo automaticamente.'),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final answered = _answeredQuestions;
-    final total = _totalQuestions;
-    final allAnswered = total > 0 && answered == total;
+    final isAllCategoriesComplete = _isAllCategoriesComplete;
+    final primaryButtonEnabled = _isSubmitting
+        ? false
+        : isAllCategoriesComplete
+        ? true
+        : _canAdvanceCurrentCategory;
+    final primaryButtonText = isAllCategoriesComplete
+        ? 'Enviar para validacao'
+        : 'Salvar e ir para a proxima';
 
     final appBarTextStyle = _inter(
       fontSize: 20,
@@ -1008,35 +1210,36 @@ class _AuditFillPageState extends State<AuditFillPage> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _brandColor),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: _brandColor,
+          ),
         ),
         titleSpacing: 0,
-        title: Text(
-          _headerTitle,
-          style: appBarTextStyle,
-        ),
+        title: Text(_headerTitle, style: appBarTextStyle),
+        actions: [
+          IconButton(
+            onPressed: _showSaveProgressSnack,
+            icon: const Icon(Icons.save_outlined, color: _brandColor),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      _error!,
-                      style: _inter(color: _mutedColor),
-                    ),
-                  ),
-                )
-              : _buildContent(),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(_error!, style: _inter(color: _mutedColor)),
+              ),
+            )
+          : _buildContent(),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
           decoration: const BoxDecoration(
             color: _bgColor,
-            border: Border(
-              top: BorderSide(color: _lineColor),
-            ),
+            border: Border(top: BorderSide(color: _lineColor)),
           ),
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
           child: Column(
@@ -1047,48 +1250,20 @@ class _AuditFillPageState extends State<AuditFillPage> {
                 height: 52,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: _primaryButton,
+                    color: primaryButtonEnabled
+                        ? const Color(0xFF5A3E8E)
+                        : const Color(0xFFDCDCE6),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Progresso salvo automaticamente.'),
-                          ),
-                        );
-                      },
-                      child: Center(
-                        child: Text(
-                          'Salvar progresso',
-                          style: _inter(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: allAnswered ? const Color(0xFF5A3E8E) : const Color(0xFFDCDCE6),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: allAnswered && !_isSubmitting ? _submitForValidation : null,
+                      onTap: primaryButtonEnabled
+                          ? (isAllCategoriesComplete
+                                ? _submitForValidation
+                                : _handleSaveAndGoToNextCategory)
+                          : null,
                       child: Center(
                         child: _isSubmitting
                             ? const SizedBox(
@@ -1096,13 +1271,17 @@ class _AuditFillPageState extends State<AuditFillPage> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : Text(
-                                'Enviar para validacao',
+                                primaryButtonText,
                                 style: _inter(
-                                  color: allAnswered ? Colors.white : const Color(0xFF9A9AB0),
+                                  color: primaryButtonEnabled
+                                      ? Colors.white
+                                      : const Color(0xFF9A9AB0),
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1158,4 +1337,54 @@ class _QuestionItem {
     required this.text,
     required this.order,
   });
+}
+
+class _NonCompliantPendingIssue {
+  final String questionId;
+  final String questionText;
+  final int order;
+  final bool missingComment;
+  final bool missingPhoto;
+
+  const _NonCompliantPendingIssue({
+    required this.questionId,
+    required this.questionText,
+    required this.order,
+    required this.missingComment,
+    required this.missingPhoto,
+  });
+}
+
+class _StickyAuditHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double minExtentValue;
+  final double maxExtentValue;
+  final Widget child;
+
+  const _StickyAuditHeaderDelegate({
+    required this.minExtentValue,
+    required this.maxExtentValue,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minExtentValue;
+
+  @override
+  double get maxExtent => maxExtentValue;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _StickyAuditHeaderDelegate oldDelegate) {
+    return minExtentValue != oldDelegate.minExtentValue ||
+        maxExtentValue != oldDelegate.maxExtentValue ||
+        child != oldDelegate.child;
+  }
 }

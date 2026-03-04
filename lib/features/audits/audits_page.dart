@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../auth/login_page.dart';
+import '../clients/clients_page.dart';
 import 'models/audit_model.dart';
 import 'pages/audit_detail_page.dart';
 import 'pages/new_audit_page.dart';
@@ -240,6 +241,15 @@ class _AuditsPageState extends State<AuditsPage> {
           ),
         ),
         actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ClientsPage()),
+              );
+            },
+            icon: const Icon(Icons.person_outline, color: Color(0xFF39306E)),
+          ),
           IconButton(
             onPressed: _isSigningOut ? null : _handleSignOut,
             icon: const Icon(Icons.logout, color: Color(0xFF39306E)),
