@@ -80,7 +80,7 @@
     .page {
       width: 100%;
       background: var(--paper);
-      padding-top: 2px;
+      padding-top: 8px;
       padding-bottom: 48px;
     }
 
@@ -128,13 +128,24 @@
     .container {
       width: 100%;
       border: 1px solid var(--line);
-      border-top: none;
       padding: 20px;
       background: var(--paper);
       box-sizing: border-box;
+      position: relative;
       overflow: visible;
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
+    }
+
+    .container::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 1px;
+      background: var(--line);
+      pointer-events: none;
     }
 
     .header {
@@ -463,6 +474,20 @@
     .institutional-footer strong {
       color: var(--text);
     }
+
+    .conclusion-block {
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
+    .conclusion-block .section,
+    .conclusion-block .section h2,
+    .conclusion-block .conclusion,
+    .conclusion-block .normative,
+    .conclusion-block .institutional-footer {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
   </style>
 </head>
 <body>
@@ -551,28 +576,30 @@
         </table>
       </section>
 
-      <section class="section">
-        <h2>6. Conclusão Técnica</h2>
-        <p class="conclusion">
-          Com base na avaliação realizada, a unidade apresentou classificação
-          <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas
-          prioritárias nos itens identificados como não conformes.
-          <br /><br />
-          Recomenda-se acompanhamento técnico e reavaliação no próximo ciclo de auditoria.
-        </p>
-        <p class="normative">
-          <strong>Referência normativa:</strong> Resolução RDC nº 216, de 15 de setembro de 2004 - ANVISA -
-          Regulamento Técnico de Boas Práticas para Serviços de Alimentação.
-        </p>
-      </section>
+      <div class="conclusion-block">
+        <section class="section keep-whole">
+          <h2>6. Conclusão Técnica</h2>
+          <p class="conclusion">
+            Com base na avaliação realizada, a unidade apresentou classificação
+            <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas
+            prioritárias nos itens identificados como não conformes.
+            <br /><br />
+            Recomenda-se acompanhamento técnico e reavaliação no próximo ciclo de auditoria.
+          </p>
+          <p class="normative">
+            <strong>Referência normativa:</strong> Resolução RDC nº 216, de 15 de setembro de 2004 - ANVISA -
+            Regulamento Técnico de Boas Práticas para Serviços de Alimentação.
+          </p>
+        </section>
 
-      <div class="institutional-footer">
-        <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Logo Institucional" />
-        <p><strong>Claudia Artezi</strong></p>
-        <p>Responsável Técnica</p>
-        <p>São Paulo - SP</p>
-        <br />
-        <p>Os direitos autorais deste documento pertencem às empresas Artezi e ATAC. Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente, sem autorização prévia e expressa. Todos os direitos e marcas são devidamente reconhecidos.</p>
+        <div class="institutional-footer">
+          <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Logo Institucional" />
+          <p><strong>Claudia Artezi</strong></p>
+          <p>Responsável Técnica</p>
+          <p>São Paulo - SP</p>
+          <br />
+          <p>Os direitos autorais deste documento pertencem às empresas Artezi e ATAC. Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente, sem autorização prévia e expressa. Todos os direitos e marcas são devidamente reconhecidos.</p>
+        </div>
       </div>
     </div>
   </div>

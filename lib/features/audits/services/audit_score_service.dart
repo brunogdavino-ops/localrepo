@@ -17,7 +17,8 @@ class AuditScoreService {
     if (_computeScoreCallable != null) {
       return _computeScoreCallable(auditId);
     }
-    final functions = _functions ?? FirebaseFunctions.instance;
+    final functions =
+        _functions ?? FirebaseFunctions.instanceFor(region: 'southamerica-east1');
     final callable = functions.httpsCallable('computeAndPersistAuditScore');
     final response = await callable.call<Map<String, dynamic>>({
       'auditId': auditId,

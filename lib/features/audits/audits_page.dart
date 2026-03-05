@@ -220,7 +220,7 @@ class _AuditsPageState extends State<AuditsPage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const SizedBox.shrink();
+      return const LoginPage();
     }
 
     final width = MediaQuery.of(context).size.width;

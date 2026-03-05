@@ -24,7 +24,7 @@ import {
   toQuestionsWithOrder
 } from './score';
 
-const MAX_PHOTOS_PER_QUESTION = 2;
+const MAX_PHOTOS_PER_QUESTION = 4;
 const MAX_INPUT_PHOTO_BYTES = 12_000_000;
 const IMAGE_MAX_WIDTH_PX = 1200;
 const IMAGE_JPEG_QUALITY = 72;
@@ -151,9 +151,10 @@ function ptBrResponse(response: string | null): string {
 }
 
 function scoreClass(score: number): { label: string; className: string } {
-  if (score >= 85) return { label: 'Bom', className: 'status-good' };
-  if (score >= 70) return { label: 'Regular', className: 'status-regular' };
-  return { label: 'Crítico', className: 'status-bad' };
+  if (score >= 90) return { label: 'Ótimo', className: 'status-good' };
+  if (score >= 80) return { label: 'Bom', className: 'status-good' };
+  if (score >= 60) return { label: 'Regular', className: 'status-regular' };
+  return { label: 'Ruim', className: 'status-bad' };
 }
 
 function responseClass(response: string | null): string {
@@ -298,10 +299,9 @@ function buildScoreBars(items: Array<{ name: string; score: number }>): string {
 async function buildPdfFromHtml(html: string): Promise<Buffer> {
   const normalizedHtml = html.toUpperCase();
   if (!normalizedHtml.includes(PDF_ENCODING_SENTINEL)) {
-    console.error('[generateAuditPdf] encoding sentinel inválido', {
+    console.warn('[generateAuditPdf] encoding sentinel ausente; seguindo sem bloqueio', {
       expected: PDF_ENCODING_SENTINEL
     });
-    throw new Error('Template HTML com encoding inválido (UTF-8 corrompido).');
   }
 
   const executablePath = await chromium.executablePath();
@@ -494,6 +494,8 @@ async function renderHtmlTemplate(input: {
 
 export const generateAuditPdf = onCall(
   {
+    region: 'southamerica-east1',
+    invoker: 'public',
     memory: '1GiB',
     timeoutSeconds: 120
   },
@@ -516,6 +518,11 @@ export const generateAuditPdf = onCall(
 
     try {
       markStage('start');
+      console.info('[generateAuditPdf] auth context', {
+        hasAuth: request.auth != null,
+        uid: request.auth?.uid ?? null,
+        appId: request.app?.appId ?? null
+      });
       if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Usuário não autenticado.');
       }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -399,10 +398,13 @@ class _AuditFillPageState extends State<AuditFillPage> {
       final filePath =
           'audit_photos/${widget.auditId}/${answerRef.id}/${photoDoc.id}.jpg';
       final storageRef = _storage.ref().child(filePath);
-      final file = File(picked.path);
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty) {
+        throw StateError('Arquivo de foto vazio.');
+      }
 
-      await storageRef.putFile(
-        file,
+      await storageRef.putData(
+        bytes,
         SettableMetadata(contentType: 'image/jpeg'),
       );
       final url = await storageRef.getDownloadURL();

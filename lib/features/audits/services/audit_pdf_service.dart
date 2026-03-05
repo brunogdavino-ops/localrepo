@@ -1,12 +1,13 @@
-import 'dart:io';
-
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import 'package:share_plus/share_plus.dart';
 
-typedef GeneratePdfCallable =
-    Future<Map<String, dynamic>> Function(String auditId);
-typedef TempDirProvider = Future<Directory> Function();
+import 'audit_pdf_platform_io.dart'
+    if (dart.library.html) 'audit_pdf_platform_web.dart' as pdf_platform;
+
+typedef GeneratePdfCallable = Future<Map<String, dynamic>> Function(String auditId);
+typedef SharePdfFileCallback = Future<void> Function(String filePath);
+typedef OpenPdfUrlCallback = Future<void> Function(String url);
 
 class PdfDownloadException implements Exception {
   PdfDownloadException(this.statusCode);
@@ -17,21 +18,33 @@ class PdfDownloadException implements Exception {
   String toString() => 'PdfDownloadException(statusCode: $statusCode)';
 }
 
+class PdfSessionExpiredException implements Exception {
+  const PdfSessionExpiredException();
+
+  @override
+  String toString() => 'PdfSessionExpiredException';
+}
+
 class AuditPdfService {
   AuditPdfService({
     FirebaseFunctions? functions,
     http.Client? httpClient,
-    TempDirProvider? tempDirProvider,
     GeneratePdfCallable? generatePdfCallable,
-  }) : _functions = functions ?? FirebaseFunctions.instance,
+    SharePdfFileCallback? sharePdfFile,
+    OpenPdfUrlCallback? openPdfUrl,
+  }) : _functions = functions,
        _httpClient = httpClient ?? http.Client(),
-       _tempDirProvider = tempDirProvider ?? _defaultTempDirProvider,
-       _generatePdfCallable = generatePdfCallable;
+       _generatePdfCallable = generatePdfCallable,
+       _sharePdfFile = sharePdfFile ?? pdf_platform.sharePdfFile,
+       _openPdfUrl = openPdfUrl ?? pdf_platform.openPdfUrl;
 
-  final FirebaseFunctions _functions;
+  final FirebaseFunctions? _functions;
   final http.Client _httpClient;
-  final TempDirProvider _tempDirProvider;
   final GeneratePdfCallable? _generatePdfCallable;
+  final SharePdfFileCallback _sharePdfFile;
+  final OpenPdfUrlCallback _openPdfUrl;
+
+  bool get supportsFileDownload => pdf_platform.supportsFileDownload;
 
   Future<String> generatePdfUrl(String auditId) async {
     final data = _generatePdfCallable == null
@@ -42,13 +55,9 @@ class AuditPdfService {
     final downloadUrl = (data['downloadUrl'] as String?)?.trim();
     final resolvedUrl = (url != null && url.isNotEmpty)
         ? url
-        : ((downloadUrl != null && downloadUrl.isNotEmpty)
-              ? downloadUrl
-              : null);
+        : ((downloadUrl != null && downloadUrl.isNotEmpty) ? downloadUrl : null);
     if (resolvedUrl == null) {
-      throw StateError(
-        'Resposta invalida da funcao: campo url ausente ou vazio.',
-      );
+      throw StateError('Resposta invalida da funcao: campo url ausente ou vazio.');
     }
     return resolvedUrl;
   }
@@ -59,38 +68,39 @@ class AuditPdfService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw PdfDownloadException(response.statusCode);
     }
-
-    final tempDir = await _tempDirProvider();
-    final filePath =
-        '${tempDir.path}${Platform.pathSeparator}auditoria_${DateTime.now().millisecondsSinceEpoch}.pdf';
-    final file = File(filePath);
-    await file.writeAsBytes(response.bodyBytes, flush: true);
-    return file.path;
+    return pdf_platform.savePdfBytes(response.bodyBytes);
   }
 
   Future<void> sharePdf(String filePath) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw StateError('Arquivo de PDF nao encontrado para compartilhamento.');
-    }
-    await Share.shareXFiles([XFile(file.path)], text: 'Relatorio de auditoria');
+    await _sharePdfFile(filePath);
   }
 
-  Future<Map<String, dynamic>> _defaultGeneratePdfCallable(
-    String auditId,
-  ) async {
-    final callable = _functions.httpsCallable('generateAuditPdf');
-    final result = await callable.call<Map<String, dynamic>>({
-      'auditId': auditId,
-    });
+  Future<void> openPdfUrl(String url) async {
+    await _openPdfUrl(url);
+  }
+
+  Future<Map<String, dynamic>> _defaultGeneratePdfCallable(String auditId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const PdfSessionExpiredException();
+    }
+
+    try {
+      await user.getIdToken(true);
+    } catch (_) {
+      throw const PdfSessionExpiredException();
+    }
+
+    final callable = (_functions ??
+            FirebaseFunctions.instanceFor(region: 'southamerica-east1'))
+        .httpsCallable(
+      'generateAuditPdf',
+    );
+    final result = await callable.call<Map<String, dynamic>>({'auditId': auditId});
     return Map<String, dynamic>.from(result.data);
   }
 
   void dispose() {
     _httpClient.close();
-  }
-
-  static Future<Directory> _defaultTempDirProvider() async {
-    return Directory.systemTemp;
   }
 }

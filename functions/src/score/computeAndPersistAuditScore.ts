@@ -207,6 +207,7 @@ export async function computeAndPersistAuditScoreHandler(
 
 export const computeAndPersistAuditScore = onCall(
   {
+    region: 'southamerica-east1',
     memory: '256MiB',
     timeoutSeconds: 60
   },

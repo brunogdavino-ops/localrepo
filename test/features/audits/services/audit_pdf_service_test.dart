@@ -39,7 +39,6 @@ void main() {
 
       final service = AuditPdfService(
         httpClient: client,
-        tempDirProvider: () async => tempDir,
         generatePdfCallable: (_) async => {'url': 'https://example.com/report.pdf'},
       );
 
@@ -52,16 +51,19 @@ void main() {
       service.dispose();
     });
 
-    test('sharePdf throws while fallback is disabled', () async {
+    test('sharePdf delegates to injected callback', () async {
       final tempDir = await Directory.systemTemp.createTemp('audit_pdf_share_test');
       final file = File('${tempDir.path}${Platform.pathSeparator}report.pdf');
       await file.writeAsBytes(const [1, 2, 3]);
-      final service = AuditPdfService();
-
-      expect(
-        () => service.sharePdf(file.path),
-        throwsA(isA<UnimplementedError>()),
+      var sharedPath = '';
+      final service = AuditPdfService(
+        sharePdfFile: (path) async {
+          sharedPath = path;
+        },
       );
+
+      await service.sharePdf(file.path);
+      expect(sharedPath, file.path);
 
       await tempDir.delete(recursive: true);
       service.dispose();

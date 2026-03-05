@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../auth/login_page.dart';
 import '../models/audit_model.dart';
 import 'audit_fill_page.dart';
 import '../services/audit_pdf_service.dart';
@@ -326,93 +329,135 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       _isGeneratingPdf = true;
     });
 
-    String url;
     try {
-      if (_refreshScoreBeforePdf) {
-        try {
-          await _auditScoreService.computeAndPersistScore(widget.auditId);
-        } on FirebaseFunctionsException catch (error) {
-          debugPrint(
-            'computeAndPersistAuditScore before PDF failed (${error.code}): ${error.message}',
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Nao foi possivel atualizar o score agora. PDF sera gerado com o ultimo score salvo.',
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        await _handleExpiredSession();
+        return;
+      }
+
+      try {
+        await currentUser.getIdToken(true);
+      } catch (_) {
+        await _handleExpiredSession();
+        return;
+      }
+
+      String url;
+      try {
+        if (_refreshScoreBeforePdf) {
+          try {
+            await _auditScoreService.computeAndPersistScore(widget.auditId);
+          } on FirebaseFunctionsException catch (error) {
+            debugPrint(
+              'computeAndPersistAuditScore before PDF failed (${error.code}): ${error.message}',
+            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Nao foi possivel atualizar o score agora. O PDF sera gerado com o ultimo score salvo.',
+                  ),
                 ),
-              ),
+              );
+            }
+          } catch (error) {
+            debugPrint(
+              'computeAndPersistAuditScore before PDF unexpected error: $error',
             );
           }
-        } catch (error) {
-          debugPrint(
-            'computeAndPersistAuditScore before PDF unexpected error: $error',
+        }
+        url = await _auditPdfService.generatePdfUrl(widget.auditId);
+      } on PdfSessionExpiredException {
+        await _handleExpiredSession();
+        return;
+      } on FirebaseFunctionsException catch (error, stackTrace) {
+        debugPrint('PDF callable error (${error.code}): $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_pdfFunctionErrorMessage(error))));
+        return;
+      } on StateError catch (error, stackTrace) {
+        debugPrint('PDF callable invalid response: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Resposta invalida da funcao de PDF.')),
+        );
+        return;
+      } catch (error, stackTrace) {
+        debugPrint('PDF callable unexpected error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Falha ao gerar PDF.')));
+        return;
+      }
+
+      if (kIsWeb) {
+        try {
+          await _auditPdfService.openPdfUrl(url);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('PDF gerado. Abrimos uma nova aba para download.'),
+            ),
+          );
+        } catch (error, stackTrace) {
+          debugPrint('PDF web open-url error: $error');
+          debugPrintStack(stackTrace: stackTrace);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Falha ao abrir o PDF no navegador.')),
           );
         }
+        return;
       }
-      url = await _auditPdfService.generatePdfUrl(widget.auditId);
-    } on FirebaseFunctionsException catch (error, stackTrace) {
-      debugPrint('PDF callable error (${error.code}): $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_pdfFunctionErrorMessage(error))));
-      return;
-    } on StateError catch (error, stackTrace) {
-      debugPrint('PDF callable invalid response: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Resposta invalida da funcao de PDF.')),
-      );
-      return;
-    } catch (error, stackTrace) {
-      debugPrint('PDF callable unexpected error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Falha ao gerar PDF.')));
-      return;
-    }
 
-    String filePath;
-    try {
-      filePath = await _auditPdfService.downloadPdf(url);
-    } on PdfDownloadException catch (error, stackTrace) {
-      debugPrint('PDF download error (status ${error.statusCode}): $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Falha ao baixar PDF (status ${error.statusCode}).'),
-        ),
-      );
-      return;
-    } catch (error, stackTrace) {
-      debugPrint('PDF download unexpected error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Falha ao baixar PDF.')));
-      return;
-    }
+      String filePath;
+      try {
+        filePath = await _auditPdfService.downloadPdf(url);
+      } on PdfDownloadException catch (error, stackTrace) {
+        debugPrint('PDF download error (status ${error.statusCode}): $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha ao baixar PDF (status ${error.statusCode}).'),
+          ),
+        );
+        return;
+      } catch (error, stackTrace) {
+        debugPrint('PDF download unexpected error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Falha ao baixar PDF.')));
+        return;
+      }
 
-    try {
-      await _auditPdfService.sharePdf(filePath);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF pronto para compartilhamento.')),
-      );
-    } catch (error, stackTrace) {
-      debugPrint('PDF share error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Falha ao compartilhar PDF.')),
-      );
+      try {
+        await _auditPdfService.sharePdf(filePath);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF pronto para compartilhamento.')),
+        );
+      } catch (error, stackTrace) {
+        debugPrint('PDF share error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Falha ao compartilhar PDF. Use o download gerado no navegador.',
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -420,6 +465,17 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
         });
       }
     }
+  }
+
+  Future<void> _handleExpiredSession() async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sessao expirada. Faca login novamente.')),
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (_) => false,
+    );
   }
 
   String _pdfFunctionErrorMessage(FirebaseFunctionsException error) {

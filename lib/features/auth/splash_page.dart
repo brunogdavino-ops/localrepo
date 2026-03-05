@@ -1,6 +1,8 @@
-﻿import 'dart:async';
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import '../audits/audits_page.dart';
 import 'login_page.dart';
 
@@ -13,21 +15,50 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   Timer? _timer;
+  bool _delayDone = false;
+  bool _authResolved = false;
+  bool _hasNavigated = false;
+  User? _resolvedUser;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
 
-      final user = FirebaseAuth.instance.currentUser;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => user != null ? const AuditsPage() : const LoginPage(),
-        ),
-      );
+    _timer = Timer(const Duration(seconds: 2), () {
+      _delayDone = true;
+      _tryNavigate();
     });
+
+    FirebaseAuth.instance
+        .authStateChanges()
+        .first
+        .timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => FirebaseAuth.instance.currentUser,
+        )
+        .then((user) {
+          _resolvedUser = user;
+          _authResolved = true;
+          _tryNavigate();
+        })
+        .catchError((_) {
+          _resolvedUser = FirebaseAuth.instance.currentUser;
+          _authResolved = true;
+          _tryNavigate();
+        });
+  }
+
+  void _tryNavigate() {
+    if (_hasNavigated || !_delayDone || !_authResolved || !mounted) return;
+    _hasNavigated = true;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            _resolvedUser != null ? const AuditsPage() : const LoginPage(),
+      ),
+    );
   }
 
   @override

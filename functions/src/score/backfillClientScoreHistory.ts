@@ -103,6 +103,7 @@ export async function backfillClientScoreHistoryHandler(
 
 export const backfillClientScoreHistory = onCall(
   {
+    region: 'southamerica-east1',
     memory: '512MiB',
     timeoutSeconds: 540
   },
