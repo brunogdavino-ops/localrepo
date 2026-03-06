@@ -371,6 +371,19 @@
       break-inside: avoid;
     }
 
+    .checklist-comment {
+      margin-top: 6px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .checklist-comment-label {
+      color: var(--brand);
+      font-weight: 600;
+    }
+
     .nonconform {
       border: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
@@ -529,22 +542,21 @@
           • Nota Geral: {{OVERALL_SCORE}}%<br />
           • Total de Itens Avaliados: {{TOTAL_EVALUATED_ITEMS}}<br />
           • Não Conformidades Identificadas: {{NON_COMPLIANT_COUNT}}<br />
-          • Data de emissão: {{ISSUED_AT}}<br />
-          • Próxima auditoria prevista para: -
+          • Data de emissão: {{ISSUED_AT}}
         </div>
       </section>
 
       <section class="section keep-whole">
-        <h2>2. Desempenho por Categoria</h2>
-        <div class="category-bars">
-          {{CATEGORY_BARS}}
-        </div>
-      </section>
-
-      <section class="section keep-whole">
-        <h2>3. Desempenho por Responsável</h2>
+        <h2>2. Desempenho por Responsável</h2>
         <div class="category-bars">
           {{RESPONSIBLE_BARS}}
+        </div>
+      </section>
+
+      <section class="section keep-whole">
+        <h2>3. Desempenho por Categoria</h2>
+        <div class="category-bars">
+          {{CATEGORY_BARS}}
         </div>
       </section>
 

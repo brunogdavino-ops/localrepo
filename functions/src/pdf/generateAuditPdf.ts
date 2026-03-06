@@ -58,6 +58,7 @@ type ChecklistItem = {
   order: number;
   categoryName: string;
   description: string;
+  comment: string | null;
   status: string;
   statusClass: string;
 };
@@ -163,6 +164,10 @@ function responseClass(response: string | null): string {
   if (response === 'not_applicable') return 'status-na';
   if (response === 'not_observed') return 'status-not-observed';
   return 'status-muted';
+}
+
+function responsibleLabel(questionPath: string, operatorQuestionPaths: Set<string>): string {
+  return operatorQuestionPaths.has(questionPath) ? 'Operadora' : 'Cliente';
 }
 
 function assertCanAccessAudit(
@@ -751,6 +756,12 @@ export const generateAuditPdf = onCall(
           order: question.order,
           categoryName: sectionByPath.get(question.categoryPath)?.name ?? '-',
           description: question.text,
+          comment:
+            typeof answer?.['notes'] === 'string' && answer['notes'].trim().length > 0
+              ? answer['notes'].trim()
+              : typeof answer?.['comment'] === 'string' && answer['comment'].trim().length > 0
+              ? answer['comment'].trim()
+              : null,
           status: statusLabel,
           statusClass: statusCss
         });
@@ -772,7 +783,7 @@ export const generateAuditPdf = onCall(
           questionText: question.text,
           status: statusLabel,
           comment,
-          responsible: 'N/A',
+          responsible: responsibleLabel(question.path, operatorQuestionPaths),
           photos: photoUris,
           failedPhotos
         });
@@ -813,8 +824,13 @@ export const generateAuditPdf = onCall(
 
       const checklistRows = checklistItems
         .map(
-          (item) =>
-            `<tr><td>${item.order}</td><td>${escapeHtml(item.categoryName)}</td><td>${escapeHtml(item.description)}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`
+          (item) => {
+            const commentHtml =
+              item.comment == null
+                ? ''
+                : `<div class="checklist-comment"><span class="checklist-comment-label">Comentário:</span> ${escapeHtml(item.comment)}</div>`;
+            return `<tr><td>${item.order}</td><td>${escapeHtml(item.categoryName)}</td><td>${escapeHtml(item.description)}${commentHtml}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`;
+          }
         )
         .join('');
 

@@ -10,13 +10,12 @@ import 'audit_fill_page.dart';
 import '../services/audit_pdf_service.dart';
 import '../services/audit_score_service.dart';
 import '../utils/category_name_formatter.dart';
-import '../widgets/gradient_button.dart';
 import '../widgets/status_badge.dart';
 
 class AuditDetailPage extends StatefulWidget {
   final String auditId;
 
-  const AuditDetailPage({Key? key, required this.auditId}) : super(key: key);
+  const AuditDetailPage({super.key, required this.auditId});
 
   @override
   State<AuditDetailPage> createState() => _AuditDetailPageState();
@@ -30,7 +29,9 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   final AuditPdfService _auditPdfService = AuditPdfService();
   final AuditScoreService _auditScoreService = AuditScoreService();
   String? _loadedAuditStatus;
+  String? _currentUserRole;
   bool _isGeneratingPdf = false;
+  bool _isPdfLoadingDialogOpen = false;
 
   @override
   void initState() {
@@ -46,6 +47,18 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
   Future<_AuditDetailData> _loadAuditDetails() async {
     final firestore = FirebaseFirestore.instance;
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null) {
+      final userSnapshot = await firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final userData = userSnapshot.data();
+      _currentUserRole = userData?['role'] as String?;
+    } else {
+      _currentUserRole = null;
+    }
 
     final auditDoc = await firestore
         .collection('audits')
@@ -177,11 +190,12 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
     final int totalItems = groups.fold<int>(
       0,
-      (sum, group) => sum + group.items.length,
+      (totalCount, group) => totalCount + group.items.length,
     );
     final int completedItems = groups.fold<int>(
       0,
-      (sum, group) => sum + group.items.where((item) => item.isAnswered).length,
+      (totalCount, group) =>
+          totalCount + group.items.where((item) => item.isAnswered).length,
     );
 
     if (usedOverallScoreFallback || categoryFallbackCount > 0) {
@@ -291,7 +305,12 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     return double.parse(score.toStringAsFixed(1));
   }
 
+  bool _isAdminRole() {
+    return _currentUserRole == 'admin';
+  }
+
   bool _canContinueEditing(String? status) {
+    if (_isAdminRole()) return true;
     return status == 'draft' || status == 'in_progress';
   }
 
@@ -328,6 +347,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     setState(() {
       _isGeneratingPdf = true;
     });
+    _showPdfLoadingDialog();
 
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -459,6 +479,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
         );
       }
     } finally {
+      _closePdfLoadingDialog();
       if (mounted) {
         setState(() {
           _isGeneratingPdf = false;
@@ -468,6 +489,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   }
 
   Future<void> _handleExpiredSession() async {
+    _closePdfLoadingDialog();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Sessao expirada. Faca login novamente.')),
@@ -476,6 +498,26 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (_) => false,
     );
+  }
+
+  void _showPdfLoadingDialog() {
+    if (!mounted || _isPdfLoadingDialogOpen) return;
+    _isPdfLoadingDialogOpen = true;
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      barrierColor: const Color(0x99000000),
+      builder: (_) => const _PdfGeneratingDialog(),
+    ).whenComplete(() {
+      _isPdfLoadingDialogOpen = false;
+    });
+  }
+
+  void _closePdfLoadingDialog() {
+    if (!mounted || !_isPdfLoadingDialogOpen) return;
+    _isPdfLoadingDialogOpen = false;
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   String _pdfFunctionErrorMessage(FirebaseFunctionsException error) {
@@ -754,108 +796,73 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
           final double progress = detail.totalItems == 0
               ? 0
               : detail.completedItems / detail.totalItems;
-          final bool canSend = progress >= 1.0;
-
-          return Column(
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              8,
+              horizontalPadding,
+              18,
+            ),
             children: [
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    8,
-                    horizontalPadding,
-                    18,
-                  ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            detail.clientName,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1C1C1C),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Text(
-                                '${detail.overallScore.toStringAsFixed(1)}%',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                  color: primaryPurpleColor,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  '${detail.compliantCount} conformes • ${detail.nonCompliantCount} nao conformes',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${detail.formattedCode} - ${_formatDate(detail.startedAt)}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: const Color(0xFF8A8FA3),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Status: ${_statusLabel(detail.status)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: const Color(0xFF8A8FA3),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _buildProgressBar(progress),
-                        ],
+                    Text(
+                      detail.clientName,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1C1C1C),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...detail.groups.map(_buildCategorySection),
+                    Row(
+                      children: [
+                        Text(
+                          '${detail.overallScore.toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: primaryPurpleColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '${detail.compliantCount} conformes • ${detail.nonCompliantCount} nao conformes',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${detail.formattedCode} - ${_formatDate(detail.startedAt)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF8A8FA3),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Status: ${_statusLabel(detail.status)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF8A8FA3),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildProgressBar(progress),
                   ],
                 ),
               ),
-              Container(
-                color: const Color(0xFFF6F5F5),
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  12,
-                  horizontalPadding,
-                  20,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GradientButton(
-                      text: 'Salvar progresso',
-                      useGradient: false,
-                      enabled: true,
-                      onPressed: () {},
-                    ),
-                    const SizedBox(height: 12),
-                    GradientButton(
-                      text: 'Enviar para validacao',
-                      useGradient: true,
-                      enabled: canSend,
-                      onPressed: canSend ? () {} : null,
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 8),
+              ...detail.groups.map(_buildCategorySection),
             ],
           );
         },
@@ -939,4 +946,98 @@ class _QuestionAnswerItem {
   });
 
   bool get isAnswered => value.isNotEmpty && value != '-';
+}
+
+class _PdfGeneratingDialog extends StatelessWidget {
+  const _PdfGeneratingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFFFFF), Color(0xFFF4F0FF)],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE3DBFF), width: 1),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26000000),
+              blurRadius: 24,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            _PdfLoadingSpinner(),
+            SizedBox(height: 18),
+            Text(
+              'Gerando relatório PDF',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF39306E),
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Estamos processando as respostas e montando o arquivo. Isso pode levar alguns segundos.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                color: Color(0xFF8A8FA3),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PdfLoadingSpinner extends StatelessWidget {
+  const _PdfLoadingSpinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 84,
+      height: 84,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF0EAFF), Color(0xFFE7DEFF)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x2D6D4BC3),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 34,
+          height: 34,
+          child: CircularProgressIndicator(
+            strokeWidth: 3,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6D4BC3)),
+          ),
+        ),
+      ),
+    );
+  }
 }
