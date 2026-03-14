@@ -1,12 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AuditCreationService {
-  static const String _templateId = '5MtglwaR0YtQYthfTGE8';
+import 'active_template_service.dart';
 
+class AuditCreationService {
   final FirebaseFirestore _firestore;
+  final ActiveTemplateService _activeTemplateService;
 
   AuditCreationService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        _activeTemplateService = ActiveTemplateService(
+          firestore: firestore ?? FirebaseFirestore.instance,
+        );
 
   Future<String> createAudit({
     required String uid,
@@ -14,11 +18,11 @@ class AuditCreationService {
     required DateTime chosenDate,
     required bool draft,
   }) async {
+    final templateRef = await _activeTemplateService.resolveActiveTemplateRef();
     final countersRef = _firestore.collection('counters').doc('audits');
     final auditsRef = _firestore.collection('audits');
     final auditDocRef = auditsRef.doc();
     final auditorRef = _firestore.collection('users').doc(uid);
-    final templateRef = _firestore.collection('templates').doc(_templateId);
     final startDate = DateTime(chosenDate.year, chosenDate.month, chosenDate.day);
 
     await _firestore.runTransaction((transaction) async {

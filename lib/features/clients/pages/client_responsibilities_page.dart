@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../audits/services/active_template_service.dart';
+
 class ClientResponsibilitiesPage extends StatefulWidget {
   final String clientId;
   final String clientName;
@@ -18,9 +20,8 @@ class ClientResponsibilitiesPage extends StatefulWidget {
 }
 
 class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage> {
-  static const String _defaultTemplateId = '5MtglwaR0YtQYthfTGE8';
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ActiveTemplateService _activeTemplateService = ActiveTemplateService();
   final Set<String> _operatorQuestionPaths = <String>{};
   final Set<String> _expandedCategoryPaths = <String>{};
   final List<_CategorySection> _sections = <_CategorySection>[];
@@ -70,7 +71,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
               .map((entry) => entry.key),
         );
 
-      final templateRef = _firestore.collection('templates').doc(_defaultTemplateId);
+      final templateRef = await _activeTemplateService.resolveActiveTemplateRef();
 
       final categoriesSnapshot = await _firestore
           .collection('categories')

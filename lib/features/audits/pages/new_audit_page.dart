@@ -205,6 +205,16 @@ class _NewAuditPageState extends State<NewAuditPage> {
         context,
         MaterialPageRoute(builder: (_) => AuditFillPage(auditId: auditId)),
       );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message?.toString() ?? 'Nao foi possivel criar a auditoria.',
+            style: TextStyle(),
+          ),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

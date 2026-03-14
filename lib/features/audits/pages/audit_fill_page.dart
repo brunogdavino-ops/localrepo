@@ -61,6 +61,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
   static const Color _lineColor = Color(0xFFE6E6EF);
   static const Color _chipBgColor = Color(0xFFECECF3);
   static const Color _chipBorderColor = Color(0xFFE2E2EE);
+  static const int _maxPhotosPerQuestion = 4;
   static const int _photoUploadMaxDimension = 1600;
   static const int _photoUploadQuality = 76;
 
@@ -385,8 +386,49 @@ class _AuditFillPageState extends State<AuditFillPage> {
     );
   }
 
+  Future<int> _countSavedPhotos(String questionId) async {
+    final answerRef = _answerDocByQuestion[questionId];
+    if (answerRef == null) return 0;
+
+    final snapshot = await answerRef.collection('photos').get();
+    return snapshot.size;
+  }
+
+  int _inFlightPhotoCount(String questionId) {
+    return (_photoUploadingByQuestion[questionId] ?? false) ? 1 : 0;
+  }
+
+  Future<bool> _canAddMorePhotos(String questionId) async {
+    final savedPhotos = await _countSavedPhotos(questionId);
+    return savedPhotos + _inFlightPhotoCount(questionId) < _maxPhotosPerQuestion;
+  }
+
+  Future<bool> _hasReachedSavedPhotoLimit(String questionId) async {
+    final savedPhotos = await _countSavedPhotos(questionId);
+    return savedPhotos >= _maxPhotosPerQuestion;
+  }
+
   Future<void> _handleAddPhoto(String questionId) async {
     try {
+      if (_photoUploadingByQuestion[questionId] ?? false) {
+        return;
+      }
+
+      if (!await _canAddMorePhotos(questionId)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Limite de 4 fotos por pergunta atingido.'),
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _photoUploadingByQuestion[questionId] = true;
+      });
+
       final source = await _pickImageSource();
       if (source == null) return;
 
@@ -396,10 +438,9 @@ class _AuditFillPageState extends State<AuditFillPage> {
       );
       if (picked == null) return;
 
-      if (!mounted) return;
-      setState(() {
-        _photoUploadingByQuestion[questionId] = true;
-      });
+      if (await _hasReachedSavedPhotoLimit(questionId)) {
+        throw StateError('Limite de 4 fotos por pergunta atingido.');
+      }
 
       final answerRef = await _ensureAnswerRef(questionId);
       final photoDoc = answerRef.collection('photos').doc();
@@ -1026,6 +1067,21 @@ class _AuditFillPageState extends State<AuditFillPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              SizedBox(
+                width: 28,
+                height: 24,
+                child: Center(
+                  child: Text(
+                    '${question.order}',
+                    style: _inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: _brandColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(child: Text(question.text, style: questionStyle)),
               const SizedBox(width: 12),
               Row(
