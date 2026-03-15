@@ -7,10 +7,11 @@ import 'package:flutter/material.dart';
 import '../../auth/login_page.dart';
 import '../models/audit_model.dart';
 import 'audit_fill_page.dart';
+import 'audit_pdf_preview_page_stub.dart'
+    if (dart.library.io) 'audit_pdf_preview_page_mobile.dart';
 import '../services/audit_pdf_service.dart';
 import '../services/audit_score_service.dart';
 import '../utils/category_name_formatter.dart';
-import '../widgets/status_badge.dart';
 
 class AuditDetailPage extends StatefulWidget {
   final String auditId;
@@ -32,6 +33,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   String? _currentUserRole;
   bool _isGeneratingPdf = false;
   bool _isPdfLoadingDialogOpen = false;
+  bool _isHeaderMenuOpen = false;
 
   @override
   void initState() {
@@ -158,7 +160,10 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
           questionText:
               (questionData['text'] as String?) ?? 'Pergunta sem texto',
           questionOrder: (questionData['order'] as num?)?.toInt() ?? 999999,
-          value: (answerData['value'] as String?) ?? '-',
+          value:
+              (answerData['response'] as String?) ??
+              (answerData['value'] as String?) ??
+              '-',
           weight: answerData['weight'],
         ),
       );
@@ -314,17 +319,21 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     return status == 'draft' || status == 'in_progress';
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'in_progress':
-        return 'Em andamento';
-      case 'validation_pending':
-        return 'Em Validação';
-      case 'completed':
-        return 'Concluída';
-      default:
-        return status;
-    }
+  TextStyle _inter({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return TextStyle(
+      fontFamily: 'Inter',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
   }
 
   void _handleContinueEditing([String? status]) {
@@ -341,6 +350,162 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     );
   }
 
+  void _toggleHeaderMenu() {
+    if (!mounted) return;
+    setState(() {
+      _isHeaderMenuOpen = !_isHeaderMenuOpen;
+    });
+  }
+
+  void _closeHeaderMenu() {
+    if (!mounted || !_isHeaderMenuOpen) return;
+    setState(() {
+      _isHeaderMenuOpen = false;
+    });
+  }
+
+  Future<String?> _generatePdfUrlWithFeedback() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      await _handleExpiredSession();
+      return null;
+    }
+
+    try {
+      await currentUser.getIdToken(true);
+    } catch (_) {
+      await _handleExpiredSession();
+      return null;
+    }
+
+    try {
+      if (_refreshScoreBeforePdf) {
+        try {
+          await _auditScoreService.computeAndPersistScore(widget.auditId);
+        } on FirebaseFunctionsException catch (error) {
+          debugPrint(
+            'computeAndPersistAuditScore before PDF failed (${error.code}): ${error.message}',
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Nao foi possivel atualizar o score agora. O PDF sera gerado com o ultimo score salvo.',
+                ),
+              ),
+            );
+          }
+        } catch (error) {
+          debugPrint(
+            'computeAndPersistAuditScore before PDF unexpected error: $error',
+          );
+        }
+      }
+      return await _auditPdfService.generatePdfUrl(widget.auditId);
+    } on PdfSessionExpiredException {
+      await _handleExpiredSession();
+      return null;
+    } on FirebaseFunctionsException catch (error, stackTrace) {
+      debugPrint('PDF callable error (${error.code}): $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return null;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_pdfFunctionErrorMessage(error))));
+      return null;
+    } on StateError catch (error, stackTrace) {
+      debugPrint('PDF callable invalid response: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resposta invalida da funcao de PDF.')),
+      );
+      return null;
+    } catch (error, stackTrace) {
+      debugPrint('PDF callable unexpected error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return null;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falha ao gerar PDF.')));
+      return null;
+    }
+  }
+
+  Future<String?> _downloadPdfFileWithFeedback(String url) async {
+    try {
+      return await _auditPdfService.downloadPdf(url);
+    } on PdfDownloadException catch (error, stackTrace) {
+      debugPrint('PDF download error (status ${error.statusCode}): $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Falha ao baixar PDF (status ${error.statusCode}).'),
+        ),
+      );
+      return null;
+    } catch (error, stackTrace) {
+      debugPrint('PDF download unexpected error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return null;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falha ao baixar PDF.')));
+      return null;
+    }
+  }
+
+  Future<void> _handlePreviewPdf() async {
+    if (!_pdfExportEnabled || _isGeneratingPdf) return;
+
+    setState(() {
+      _isGeneratingPdf = true;
+    });
+    _showPdfLoadingDialog();
+
+    try {
+      final url = await _generatePdfUrlWithFeedback();
+      if (url == null) return;
+
+      if (kIsWeb) {
+        try {
+          await _auditPdfService.openPdfUrl(url);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Preview no web aberto em nova aba.'),
+            ),
+          );
+        } catch (error, stackTrace) {
+          debugPrint('PDF web open-url error: $error');
+          debugPrintStack(stackTrace: stackTrace);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Falha ao abrir o PDF no navegador.')),
+          );
+        }
+        return;
+      }
+
+      final filePath = await _downloadPdfFileWithFeedback(url);
+      if (filePath == null || !mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AuditPdfPreviewPage(filePath: filePath),
+        ),
+      );
+    } finally {
+      _closePdfLoadingDialog();
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+        });
+      }
+    }
+  }
+
   Future<void> _handleGeneratePdf() async {
     if (!_pdfExportEnabled || _isGeneratingPdf) return;
 
@@ -350,72 +515,8 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     _showPdfLoadingDialog();
 
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        await _handleExpiredSession();
-        return;
-      }
-
-      try {
-        await currentUser.getIdToken(true);
-      } catch (_) {
-        await _handleExpiredSession();
-        return;
-      }
-
-      String url;
-      try {
-        if (_refreshScoreBeforePdf) {
-          try {
-            await _auditScoreService.computeAndPersistScore(widget.auditId);
-          } on FirebaseFunctionsException catch (error) {
-            debugPrint(
-              'computeAndPersistAuditScore before PDF failed (${error.code}): ${error.message}',
-            );
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Nao foi possivel atualizar o score agora. O PDF sera gerado com o ultimo score salvo.',
-                  ),
-                ),
-              );
-            }
-          } catch (error) {
-            debugPrint(
-              'computeAndPersistAuditScore before PDF unexpected error: $error',
-            );
-          }
-        }
-        url = await _auditPdfService.generatePdfUrl(widget.auditId);
-      } on PdfSessionExpiredException {
-        await _handleExpiredSession();
-        return;
-      } on FirebaseFunctionsException catch (error, stackTrace) {
-        debugPrint('PDF callable error (${error.code}): $error');
-        debugPrintStack(stackTrace: stackTrace);
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_pdfFunctionErrorMessage(error))));
-        return;
-      } on StateError catch (error, stackTrace) {
-        debugPrint('PDF callable invalid response: $error');
-        debugPrintStack(stackTrace: stackTrace);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Resposta invalida da funcao de PDF.')),
-        );
-        return;
-      } catch (error, stackTrace) {
-        debugPrint('PDF callable unexpected error: $error');
-        debugPrintStack(stackTrace: stackTrace);
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Falha ao gerar PDF.')));
-        return;
-      }
+      final url = await _generatePdfUrlWithFeedback();
+      if (url == null) return;
 
       if (kIsWeb) {
         try {
@@ -437,28 +538,8 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
         return;
       }
 
-      String filePath;
-      try {
-        filePath = await _auditPdfService.downloadPdf(url);
-      } on PdfDownloadException catch (error, stackTrace) {
-        debugPrint('PDF download error (status ${error.statusCode}): $error');
-        debugPrintStack(stackTrace: stackTrace);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Falha ao baixar PDF (status ${error.statusCode}).'),
-          ),
-        );
-        return;
-      } catch (error, stackTrace) {
-        debugPrint('PDF download unexpected error: $error');
-        debugPrintStack(stackTrace: stackTrace);
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Falha ao baixar PDF.')));
-        return;
-      }
+      final filePath = await _downloadPdfFileWithFeedback(url);
+      if (filePath == null) return;
 
       try {
         await _auditPdfService.sharePdf(filePath);
@@ -568,11 +649,13 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   IconData _valueIcon(String value) {
     switch (value) {
       case 'compliant':
-        return Icons.check_circle;
+        return Icons.check_circle_outline;
       case 'non_compliant':
-        return Icons.cancel;
+        return Icons.cancel_outlined;
       case 'not_applicable':
-        return Icons.remove_circle;
+        return Icons.remove_circle_outline;
+      case 'not_observed':
+        return Icons.visibility_off;
       default:
         return Icons.help_outline;
     }
@@ -586,133 +669,135 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
         return const Color(0xFFDC2626);
       case 'not_applicable':
         return const Color(0xFF8A8FA3);
+      case 'not_observed':
+        return const Color(0xFF4B79D8);
       default:
         return const Color(0xFF8A8FA3);
     }
   }
 
-  Widget _buildProgressBar(double progress) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE3E3EC),
-            borderRadius: BorderRadius.circular(999),
+  Widget _buildSummaryCard(_AuditDetailData detail, double progress) {
+    return RepaintBoundary(
+      child: Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0F171A24),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: progress.clamp(0.0, 1.0),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF6D4BC3), Color(0xFF5A3E8E)],
-                    ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  detail.clientName,
+                  style: _inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF7357D8),
+                    letterSpacing: -0.8,
                   ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Text(
+                  '${detail.formattedCode} - ${_formatDate(detail.startedAt)}',
+                  style: _inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF72778A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${(progress * 100).round()}% concluido',
+                  style: _inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF72778A),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${(progress * 100).round()}% concluido',
-          style: TextStyle(fontSize: 12, color: const Color(0xFF8A8FA3)),
-        ),
-      ],
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${detail.overallScore.toStringAsFixed(1)}%',
+                style: _inter(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF7357D8),
+                  letterSpacing: -0.8,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${detail.compliantCount} conformes',
+                style: _inter(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF72778A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${detail.nonCompliantCount} nao conformes',
+                style: _inter(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF72778A),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      ),
     );
   }
 
   Widget _buildCategorySection(_CategoryGroup group) {
-    final int total = group.items.length;
-    final int filled = group.items.where((item) => item.isAnswered).length;
-    final bool completed = total > 0 && filled == total;
-
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE6E6EF), width: 1)),
+    return RepaintBoundary(
+      child: _AuditCategoryCard(
+        key: PageStorageKey(group.categoryRefPath),
+        group: group,
+        valueIcon: _valueIcon,
+        valueColor: _valueColor,
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(vertical: 8),
-          childrenPadding: const EdgeInsets.only(bottom: 10),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      formatCategoryName(group.categoryName),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF39306E),
-                      ),
-                    ),
-                  ),
-                  StatusBadge(
-                    label: completed ? 'Concluida' : 'Pendente',
-                    type: completed
-                        ? StatusBadgeType.completed
-                        : StatusBadgeType.pending,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '$filled de $total itens preenchidos',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF8A8FA3),
-                    ),
-                  ),
-                  Text(
-                    '${group.categoryScore.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF6D4BC3),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          children: group.items
-              .map((item) {
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  title: Text(
-                    item.questionText,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: const Color(0xFF1C1C1C),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${item.value} - Peso ${item.weight ?? '-'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF8A8FA3),
-                    ),
-                  ),
-                  trailing: Icon(
-                    _valueIcon(item.value),
-                    color: _valueColor(item.value),
-                  ),
-                );
-              })
-              .toList(growable: false),
+    );
+  }
+
+  Widget _buildHeaderActionButton({
+    required VoidCallback? onPressed,
+    required IconData icon,
+  }) {
+    return Container(
+      width: 32,
+      height: 32,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEE9FF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        splashRadius: 18,
+        padding: EdgeInsets.zero,
+        icon: Icon(
+          icon,
+          size: 18,
+          color: const Color(0xFF7357D8),
         ),
       ),
     );
@@ -723,53 +808,123 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     final width = MediaQuery.of(context).size.width;
     final horizontalPadding = width >= 900
         ? width * 0.16
-        : (width >= 600 ? 24.0 : 20.0);
-    const primaryPurpleColor = Color(0xFF6D4BC3);
+        : (width >= 600 ? 24.0 : 16.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F5F5),
+      backgroundColor: const Color(0xFFF7F7FB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF6F5F5),
-        surfaceTintColor: const Color(0xFFF6F5F5),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF39306E)),
-        ),
-        actions: [
-          if (_pdfExportEnabled)
-            IconButton(
-              onPressed: _isGeneratingPdf ? null : _handleGeneratePdf,
-              icon: _isGeneratingPdf
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF39306E),
-                        ),
-                      ),
-                    )
-                  : const Icon(
-                      Icons.insert_drive_file_outlined,
-                      color: Color(0xFF39306E),
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Color(0xFF39306E),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 180),
+                    opacity: _isHeaderMenuOpen ? 0.28 : 1,
+                    child: Image.asset(
+                      'assets/logo-escura.png',
+                      height: 28,
+                      fit: BoxFit.contain,
                     ),
-            ),
-          IconButton(
-            onPressed: () => _handleContinueEditing(_loadedAuditStatus),
-            icon: Icon(
-              Icons.edit_outlined,
-              color: _canContinueEditing(_loadedAuditStatus)
-                  ? const Color(0xFF39306E)
-                  : const Color(0xFF8A8FA3),
-            ),
+                  ),
+                ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 160),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SizeTransition(
+                            sizeFactor: animation,
+                            axis: Axis.horizontal,
+                            axisAlignment: 1,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _isHeaderMenuOpen
+                          ? Row(
+                              key: const ValueKey('header-actions-open'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildHeaderActionButton(
+                                  onPressed: () {
+                                    _closeHeaderMenu();
+                                    _handleContinueEditing(_loadedAuditStatus);
+                                  },
+                                  icon: Icons.edit_outlined,
+                                ),
+                                if (_pdfExportEnabled)
+                                  _buildHeaderActionButton(
+                                    onPressed: _isGeneratingPdf
+                                        ? null
+                                        : () {
+                                            _closeHeaderMenu();
+                                            _handleGeneratePdf();
+                                          },
+                                    icon: Icons.share_outlined,
+                                  ),
+                                if (_pdfExportEnabled)
+                                  _buildHeaderActionButton(
+                                    onPressed: _isGeneratingPdf
+                                        ? null
+                                        : () {
+                                            _closeHeaderMenu();
+                                            _handlePreviewPdf();
+                                          },
+                                    icon: Icons.picture_as_pdf_outlined,
+                                  ),
+                              ],
+                            )
+                          : const SizedBox(
+                              key: ValueKey('header-actions-closed'),
+                              width: 0,
+                            ),
+                    ),
+                    IconButton(
+                      onPressed: _toggleHeaderMenu,
+                      icon: Icon(
+                        _isHeaderMenuOpen
+                            ? Icons.more_horiz_rounded
+                            : Icons.more_vert_rounded,
+                        color: const Color(0xFF7357D8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-      body: FutureBuilder<_AuditDetailData>(
-        future: _detailFuture,
-        builder: (context, snapshot) {
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _closeHeaderMenu,
+        child: FutureBuilder<_AuditDetailData>(
+          future: _detailFuture,
+          builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -798,74 +953,23 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
               : detail.completedItems / detail.totalItems;
           return ListView(
             padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              8,
-              horizontalPadding,
-              18,
+              0,
+              0,
+              0,
+              24,
             ),
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      detail.clientName,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1C1C1C),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Text(
-                          '${detail.overallScore.toStringAsFixed(1)}%',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: primaryPurpleColor,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '${detail.compliantCount} conformes • ${detail.nonCompliantCount} nao conformes',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${detail.formattedCode} - ${_formatDate(detail.startedAt)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: const Color(0xFF8A8FA3),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Status: ${_statusLabel(detail.status)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: const Color(0xFF8A8FA3),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildProgressBar(progress),
-                  ],
+              _buildSummaryCard(detail, progress),
+              ...detail.groups.map(
+                (group) => Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: _buildCategorySection(group),
                 ),
               ),
-              const SizedBox(height: 8),
-              ...detail.groups.map(_buildCategorySection),
             ],
           );
-        },
+          },
+        ),
       ),
     );
   }
@@ -948,6 +1052,232 @@ class _QuestionAnswerItem {
   bool get isAnswered => value.isNotEmpty && value != '-';
 }
 
+class _AuditCategoryCard extends StatefulWidget {
+  final _CategoryGroup group;
+  final IconData Function(String value) valueIcon;
+  final Color Function(String value) valueColor;
+
+  const _AuditCategoryCard({
+    super.key,
+    required this.group,
+    required this.valueIcon,
+    required this.valueColor,
+  });
+
+  @override
+  State<_AuditCategoryCard> createState() => _AuditCategoryCardState();
+}
+
+class _AuditCategoryCardState extends State<_AuditCategoryCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final group = widget.group;
+    final total = group.items.length;
+    final filled = group.items.where((item) => item.isAnswered).length;
+    final completed = total > 0 && filled == total;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F171A24),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                group.categoryName,
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1B1830),
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _AuditCategoryBadge(completed: completed),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '$filled de $total itens preenchidos',
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF72778A),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${group.categoryScore.toStringAsFixed(1)}%',
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF7357D8),
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              _isExpanded
+                                  ? Icons.expand_less_rounded
+                                  : Icons.expand_more_rounded,
+                              color: const Color(0xFF72778A),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                children: [
+                  for (int index = 0; index < group.items.length; index++) ...[
+                    if (index > 0) const SizedBox(height: 12),
+                    _AuditQuestionTile(
+                      item: group.items[index],
+                      valueIcon: widget.valueIcon,
+                      valueColor: widget.valueColor,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuditCategoryBadge extends StatelessWidget {
+  final bool completed;
+
+  const _AuditCategoryBadge({required this.completed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: completed
+            ? const Color(0xFFE8F7EF)
+            : const Color(0xFFFFF3DF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        completed ? 'Concluida' : 'Pendente',
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          color: completed
+              ? const Color(0xFF22A861)
+              : const Color(0xFFD9921A),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuditQuestionTile extends StatelessWidget {
+  final _QuestionAnswerItem item;
+  final IconData Function(String value) valueIcon;
+  final Color Function(String value) valueColor;
+
+  const _AuditQuestionTile({
+    required this.item,
+    required this.valueIcon,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F6FA),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Text(
+              '${item.questionOrder}.',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF9A9EAE),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              item.questionText,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF171A24),
+                height: 1.45,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Icon(
+            valueIcon(item.value),
+            color: valueColor(item.value),
+            size: 21,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PdfGeneratingDialog extends StatelessWidget {
   const _PdfGeneratingDialog();
 
@@ -982,7 +1312,7 @@ class _PdfGeneratingDialog extends StatelessWidget {
             _PdfLoadingSpinner(),
             SizedBox(height: 18),
             Text(
-              'Gerando relatório PDF',
+              'Gerando relat\u00f3rio PDF',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 20,
@@ -993,7 +1323,6 @@ class _PdfGeneratingDialog extends StatelessWidget {
             SizedBox(height: 10),
             Text(
               'Estamos processando as respostas e montando o arquivo. Isso pode levar alguns segundos.',
-              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 height: 1.45,
