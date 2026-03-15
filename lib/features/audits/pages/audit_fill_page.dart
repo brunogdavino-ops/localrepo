@@ -56,6 +56,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
 
   static const Color _bgColor = Color(0xFFF6F5F5);
   static const Color _brandColor = Color(0xFF39306E);
+  static const Color _brandAccentColor = Color(0xFF7357D8);
   static const Color _blackColor = Color(0xFF1C1C1C);
   static const Color _mutedColor = Color(0xFF8A8FA3);
   static const Color _lineColor = Color(0xFFE6E6EF);
@@ -134,7 +135,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
       }
       _headerTitle = clientName == null
           ? defaultTitle
-          : 'Auditoria: $clientName';
+          : clientName;
 
       final categoriesSnapshot = await _firestore
           .collection('categories')
@@ -1233,13 +1234,23 @@ class _AuditFillPageState extends State<AuditFillPage> {
         SliverPersistentHeader(
           pinned: true,
           delegate: _StickyAuditHeaderDelegate(
-            minExtentValue: 96,
-            maxExtentValue: 96,
+            minExtentValue: 132,
+            maxExtentValue: 132,
             child: Container(
-              color: _bgColor,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    _headerTitle,
+                    style: _inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: _brandAccentColor,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -1256,7 +1267,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -1382,20 +1393,11 @@ class _AuditFillPageState extends State<AuditFillPage> {
   @override
   Widget build(BuildContext context) {
     final isAllCategoriesComplete = _isAllCategoriesComplete;
-    final primaryButtonEnabled = _isSubmitting
-        ? false
-        : isAllCategoriesComplete
-        ? true
-        : _canAdvanceCurrentCategory;
+    final showPrimaryButton = isAllCategoriesComplete || _canAdvanceCurrentCategory;
+    final primaryButtonEnabled = _isSubmitting ? false : showPrimaryButton;
     final primaryButtonText = isAllCategoriesComplete
         ? 'Concluir auditoria'
         : 'Salvar e ir para a proxima';
-
-    final appBarTextStyle = _inter(
-      fontSize: 20,
-      fontWeight: FontWeight.w700,
-      color: _blackColor,
-    );
 
     return PopScope<void>(
       canPop: false,
@@ -1406,22 +1408,28 @@ class _AuditFillPageState extends State<AuditFillPage> {
       child: Scaffold(
         backgroundColor: _bgColor,
         appBar: AppBar(
-        backgroundColor: _bgColor,
-        surfaceTintColor: _bgColor,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           onPressed: _handlePageExit,
           icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: _brandColor,
+            color: _brandAccentColor,
           ),
         ),
         titleSpacing: 0,
-        title: Text(_headerTitle, style: appBarTextStyle),
+        title: Center(
+          child: Image.asset(
+            'assets/logo-escura.png',
+            height: 28,
+            fit: BoxFit.contain,
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: _showSaveProgressSnack,
-            icon: const Icon(Icons.save_outlined, color: _brandColor),
+            icon: const Icon(Icons.save_outlined, color: _brandAccentColor),
           ),
         ],
       ),
@@ -1435,67 +1443,64 @@ class _AuditFillPageState extends State<AuditFillPage> {
                 ),
               )
             : _buildContent(),
-        bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: _bgColor,
-            border: Border(top: BorderSide(color: _lineColor)),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: primaryButtonEnabled
-                        ? const Color(0xFF5A3E8E)
-                        : const Color(0xFFDCDCE6),
-                    borderRadius: BorderRadius.circular(16),
+        bottomNavigationBar: showPrimaryButton
+            ? SafeArea(
+                top: false,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: _bgColor,
+                    border: Border(top: BorderSide(color: _lineColor)),
                   ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: primaryButtonEnabled
+                            ? const Color(0xFF5A3E8E)
+                            : const Color(0xFFDCDCE6),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
                           onTap: primaryButtonEnabled
                               ? (isAllCategoriesComplete
                                     ? _completeAudit
                                     : _handleSaveAndGoToNextCategory)
                               : null,
-                      child: Center(
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                          child: Center(
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    primaryButtonText,
+                                    style: _inter(
+                                      color: primaryButtonEnabled
+                                          ? Colors.white
+                                          : const Color(0xFF9A9AB0),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              )
-                            : Text(
-                                primaryButtonText,
-                                style: _inter(
-                                  color: primaryButtonEnabled
-                                      ? Colors.white
-                                      : const Color(0xFF9A9AB0),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        ),
+              )
+            : null,
       ),
     );
   }
