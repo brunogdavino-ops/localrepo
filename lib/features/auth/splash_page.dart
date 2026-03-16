@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../audits/audits_page.dart';
+import '../home/home_page.dart';
 import 'login_page.dart';
 
 class SplashPage extends StatefulWidget {
-  const SplashPage({Key? key}) : super(key: key);
+  const SplashPage({super.key});
 
   @override
   State<SplashPage> createState() => _SplashPageState();
@@ -54,11 +54,11 @@ class _SplashPageState extends State<SplashPage> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) =>
-            _resolvedUser != null ? const AuditsPage() : const LoginPage(),
-      ),
-    );
+        MaterialPageRoute(
+          builder: (_) =>
+            _resolvedUser != null ? const HomePage() : const LoginPage(),
+        ),
+      );
   }
 
   @override

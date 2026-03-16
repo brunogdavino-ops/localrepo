@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -12,20 +12,40 @@ class ClientsPage extends StatefulWidget {
 }
 
 class _ClientsPageState extends State<ClientsPage> {
+  static const Color _bgColor = Color(0xFFF7F7FB);
+  static const Color _brandColor = Color(0xFF7357D8);
+  static const Color _brandDark = Color(0xFF1B1830);
+  static const Color _mutedColor = Color(0xFF72778A);
+  static const Color _softBrand = Color(0xFFEEE9FF);
+  static const Color _surfaceSoft = Color(0xFFF6F6FA);
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
 
   DocumentReference? _companyRef;
   bool _isLoading = true;
-  bool _isSearching = false;
+
+  TextStyle _inter({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return TextStyle(
+      fontFamily: 'Inter',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _loadCompanyRef();
-    _searchController.addListener(() {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
@@ -53,8 +73,7 @@ class _ClientsPageState extends State<ClientsPage> {
     return value.replaceAll(RegExp(r'\D'), '');
   }
 
-  bool _matchesSearch(Map<String, dynamic> data) {
-    final raw = _searchController.text.trim();
+  bool _matchesSearch(Map<String, dynamic> data, String raw) {
     if (raw.isEmpty) return true;
 
     final queryLower = raw.toLowerCase();
@@ -78,11 +97,200 @@ class _ClientsPageState extends State<ClientsPage> {
     );
   }
 
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+          child: SizedBox(
+            height: 60,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Transform.translate(
+                    offset: const Offset(-6, 0),
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.chevron_left,
+                        size: 28,
+                        color: _brandColor,
+                      ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Image.asset(
+                    'assets/logo-escura.png',
+                    height: 24,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: () => _openRegistration(),
+                    style: IconButton.styleFrom(
+                      backgroundColor: _softBrand,
+                      foregroundColor: _brandColor,
+                      minimumSize: const Size(32, 32),
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const Icon(Icons.add_circle, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntro() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Clientes',
+            style: _inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: _brandColor,
+              letterSpacing: -0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text(
+              'Gerencie os clientes cadastrados, pesquise rapidamente e atualize informações quando necessário.',
+              style: _inter(
+                fontSize: 14,
+                height: 1.6,
+                color: _mutedColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: _surfaceSoft,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0F171A24),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (_) => setState(() {}),
+              style: _inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: _brandDark,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Buscar cliente ou CNPJ...',
+                hintStyle: _inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF9A9EAE),
+                ),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF9A9EAE)),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClientCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final name = ((data['name'] as String?) ?? '').trim();
+    final cnpj = (((data['cnpjFormatted'] as String?) ?? '').trim().isNotEmpty)
+        ? (data['cnpjFormatted'] as String).trim()
+        : '--';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F171A24),
+            blurRadius: 28,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name.isEmpty ? 'Cliente sem nome' : name,
+                    style: _inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: _brandDark,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    cnpj,
+                    style: _inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: _mutedColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              onPressed: () => _openRegistration(clientId: doc.id),
+              style: IconButton.styleFrom(
+                backgroundColor: _softBrand,
+                foregroundColor: _brandColor,
+                minimumSize: const Size(32, 32),
+                padding: EdgeInsets.zero,
+              ),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFFF6F5F5),
+        backgroundColor: _bgColor,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -90,193 +298,73 @@ class _ClientsPageState extends State<ClientsPage> {
     final companyRef = _companyRef;
     if (companyRef == null) {
       return const Scaffold(
-        backgroundColor: Color(0xFFF6F5F5),
+        backgroundColor: _bgColor,
         body: Center(
           child: Text(
-            'Nao foi possivel identificar a empresa.',
-            style: TextStyle(color: Color(0xFF8A8FA3)),
+            'Não foi possível identificar a empresa.',
+            style: TextStyle(color: _mutedColor),
           ),
         ),
       );
     }
 
+    final rawSearch = _searchController.text.trim();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF7262C2)),
-        ),
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Buscar por nome ou CNPJ',
-                  hintStyle: TextStyle(color: Color(0xFF8A8FA3), fontSize: 14),
-                  border: InputBorder.none,
-                ),
-                style: const TextStyle(
-                  color: Color(0xFF1C1C1C),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              )
-            : const Text(
-                'Clientes',
-                style: TextStyle(
-                  color: Color(0xFF1C1C1C),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              setState(() {
-                if (_isSearching) {
-                  _searchController.clear();
-                  _isSearching = false;
-                } else {
-                  _isSearching = true;
+      backgroundColor: _bgColor,
+      body: Column(
+        children: [
+          _buildHeader(),
+          _buildIntro(),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _firestore
+                  .collection('clients')
+                  .where('companyref', isEqualTo: companyRef)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-              });
-            },
-            icon: Icon(
-              _isSearching ? Icons.close : Icons.search,
-              color: const Color(0xFF7262C2),
-            ),
-          ),
-          IconButton(
-            onPressed: () => _openRegistration(),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFFEDE9FE),
-              foregroundColor: const Color(0xFF7262C2),
-              minimumSize: const Size(36, 36),
-              padding: EdgeInsets.zero,
-            ),
-            icon: const Icon(Icons.add),
-          ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: Color(0xFFE6E6EF)),
-        ),
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _firestore
-            .collection('clients')
-            .where('companyref', isEqualTo: companyRef)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            debugPrint('ClientsPage stream error: ${snapshot.error}');
-            return const Center(
-              child: Text(
-                'Erro ao carregar clientes.',
-                style: TextStyle(color: Color(0xFF8A8FA3)),
-              ),
-            );
-          }
-
-          final docs = snapshot.data?.docs ?? const [];
-          final filtered = docs.where((doc) => _matchesSearch(doc.data())).toList()
-            ..sort((a, b) {
-              final aName = ((a.data()['name'] as String?) ?? '').toLowerCase();
-              final bName = ((b.data()['name'] as String?) ?? '').toLowerCase();
-              return aName.compareTo(bName);
-            });
-
-          if (filtered.isEmpty) {
-            return const Center(
-              child: Text(
-                'Nenhum cliente encontrado.',
-                style: TextStyle(color: Color(0xFF8A8FA3)),
-              ),
-            );
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE6E6EF)),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: Color(0xFFEEF0F6),
-                ),
-                itemBuilder: (context, index) {
-                  final doc = filtered[index];
-                  final data = doc.data();
-                  final name = ((data['name'] as String?) ?? '').trim();
-                  final cnpj =
-                      (((data['cnpjFormatted'] as String?) ?? '').trim().isNotEmpty)
-                      ? (data['cnpjFormatted'] as String).trim()
-                      : '--';
-
-                  return SizedBox(
-                    height: 72,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name.isEmpty ? 'Cliente sem nome' : name,
-                                  style: const TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1C1C1C),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  cnpj,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF8A8FA3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => _openRegistration(clientId: doc.id),
-                            icon: const Icon(
-                              Icons.edit_outlined,
-                              color: Color(0xFF7262C2),
-                            ),
-                          ),
-                        ],
-                      ),
+                if (snapshot.hasError) {
+                  debugPrint('ClientsPage stream error: ${snapshot.error}');
+                  return Center(
+                    child: Text(
+                      'Erro ao carregar clientes.',
+                      style: _inter(color: _mutedColor),
                     ),
                   );
-                },
-              ),
+                }
+
+                final docs = snapshot.data?.docs ?? const [];
+                final filtered = docs.where((doc) => _matchesSearch(doc.data(), rawSearch)).toList()
+                  ..sort((a, b) {
+                    final aName = ((a.data()['name'] as String?) ?? '').toLowerCase();
+                    final bName = ((b.data()['name'] as String?) ?? '').toLowerCase();
+                    return aName.compareTo(bName);
+                  });
+
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Nenhum cliente encontrado.',
+                      style: _inter(color: _mutedColor),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                  itemCount: filtered.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    return _buildClientCard(filtered[index]);
+                  },
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

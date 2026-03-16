@@ -1,218 +1,431 @@
-﻿import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../auth/login_page.dart';
-import '../clients/clients_page.dart';
+import '../home/home_page.dart';
 import 'models/audit_model.dart';
 import 'pages/audit_detail_page.dart';
 import 'pages/new_audit_page.dart';
 import 'services/audit_service.dart';
 
 class AuditsPage extends StatefulWidget {
-  const AuditsPage({Key? key}) : super(key: key);
+  const AuditsPage({super.key});
 
   @override
   State<AuditsPage> createState() => _AuditsPageState();
 }
 
 class _AuditsPageState extends State<AuditsPage> {
+  static const Color _bgColor = Color(0xFFF7F7FB);
+  static const Color _brandColor = Color(0xFF7357D8);
+  static const Color _brandDark = Color(0xFF1B1830);
+  static const Color _mutedColor = Color(0xFF72778A);
+
   final AuditService _auditService = AuditService();
-  final Map<String, Future<_AuditCardInfo>> _cardInfoCache = {};
-  bool _isSigningOut = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  final Map<String, Future<_AuditListItem>> _auditInfoCache = {};
+  Future<List<_AuditListItem>>? _auditItemsFuture;
+  String? _auditItemsSignature;
 
-  Future<void> _handleSignOut() async {
-    if (_isSigningOut) return;
-
-    setState(() {
-      _isSigningOut = true;
-    });
-
-    try {
-      await FirebaseAuth.instance.signOut();
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSigningOut = false;
-        });
-      }
-    }
+  @override
+  void initState() {
+    super.initState();
   }
 
-  Future<_AuditCardInfo> _loadCardInfo(AuditModel audit) async {
-    final clientSnapshot = await audit.clientRef.get();
-    final clientData = clientSnapshot.data() as Map<String, dynamic>?;
-    final clientName = (clientData?['name'] as String?)?.trim();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
-    final templateSnapshot = await audit.templateRef.get();
-    final templateData = templateSnapshot.data() as Map<String, dynamic>?;
-    final templateName =
-        ((templateData?['name'] ?? templateData?['title']) as String?)?.trim();
-
-    return _AuditCardInfo(
-      clientName: (clientName == null || clientName.isEmpty)
-          ? 'Cliente sem nome'
-          : clientName,
-      templateName: (templateName == null || templateName.isEmpty)
-          ? 'Template'
-          : templateName,
+  TextStyle _inter({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return TextStyle(
+      fontFamily: 'Inter',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
     );
   }
 
-  Future<_AuditCardInfo> _getCardInfo(AuditModel audit) {
-    return _cardInfoCache.putIfAbsent(audit.id, () => _loadCardInfo(audit));
+  Future<void> _openNewAudit() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NewAuditPage()));
+  }
+
+  void _openAuditDetail(AuditModel audit) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => AuditDetailPage(auditId: audit.id)),
+    );
+  }
+
+  void _handleBack() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
   }
 
   String _formatDate(DateTime? date) {
     if (date == null) return '--/--/----';
-
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString();
-
     return '$day/$month/$year';
   }
 
   String _statusLabel(String status) {
     switch (status) {
-      case 'in_progress':
-        return 'Em andamento';
-      case 'validation_pending':
-        return 'Em Validação';
       case 'completed':
         return 'Concluída';
+      case 'in_progress':
+      case 'draft':
+        return 'Em andamento';
       default:
-        return status;
+        return 'Em andamento';
     }
   }
 
   Color _statusBackgroundColor(String status) {
     switch (status) {
       case 'completed':
-        return Colors.green.withValues(alpha: 0.12);
-      case 'validation_pending':
-        return const Color(0xFF3B82F6).withValues(alpha: 0.12);
+        return const Color(0xFFE8F7EF);
       case 'in_progress':
-        return Colors.amber.withValues(alpha: 0.15);
+      case 'draft':
       default:
-        return Colors.amber.withValues(alpha: 0.15);
+        return const Color(0xFFFFF3DF);
     }
   }
 
   Color _statusTextColor(String status) {
     switch (status) {
       case 'completed':
-        return Colors.green;
-      case 'validation_pending':
-        return const Color(0xFF3B82F6);
+        return const Color(0xFF22A861);
       case 'in_progress':
-        return Colors.amber[800]!;
+      case 'draft':
       default:
-        return Colors.amber[800]!;
+        return const Color(0xFFD9921A);
     }
   }
 
-  Widget _buildAuditCard(BuildContext context, AuditModel audit) {
-    return FutureBuilder<_AuditCardInfo>(
-      future: _getCardInfo(audit),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: SizedBox(
-              height: 98,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.all(Radius.circular(20)),
+  String _formatTrailingMetric(AuditModel audit, double completionPercent) {
+    if (audit.status == 'completed') {
+      final score = audit.scoreFinal ?? audit.score;
+      final scoreValue = score is num ? score.toDouble() : 0.0;
+      return '${scoreValue.toStringAsFixed(1).replaceAll('.', ',')}% de score';
+    }
+
+    final rounded = completionPercent.round();
+    return '$rounded% concluído';
+  }
+
+  Future<_AuditListItem> _loadAuditListItem(AuditModel audit) async {
+    final clientSnapshot = await audit.clientRef.get();
+    final clientData = clientSnapshot.data() as Map<String, dynamic>?;
+    final clientName = (clientData?['name'] as String?)?.trim();
+
+    final answersSnapshot = await FirebaseFirestore.instance
+        .collection('audits')
+        .doc(audit.id)
+        .collection('answers')
+        .get();
+
+    final totalAnswers = answersSnapshot.docs.length;
+    final answeredCount = answersSnapshot.docs.where((doc) {
+      final data = doc.data();
+      final response = ((data['response'] as String?) ?? (data['value'] as String?))
+          ?.trim();
+      return response != null && response.isNotEmpty;
+    }).length;
+
+    final completionPercent = totalAnswers == 0
+        ? 0.0
+        : (answeredCount / totalAnswers) * 100;
+
+    return _AuditListItem(
+      audit: audit,
+      clientName: (clientName == null || clientName.isEmpty)
+          ? 'Cliente sem nome'
+          : clientName,
+      completionPercent: completionPercent.clamp(0, 100),
+    );
+  }
+
+  Future<_AuditListItem> _getAuditListItem(AuditModel audit) {
+    return _auditInfoCache.putIfAbsent(
+      audit.id,
+      () => _loadAuditListItem(audit),
+    );
+  }
+
+  Future<List<_AuditListItem>> _buildAuditItems(List<AuditModel> audits) {
+    return Future.wait(audits.map(_getAuditListItem));
+  }
+
+  Future<List<_AuditListItem>> _resolveAuditItemsFuture(List<AuditModel> audits) {
+    final signature = audits
+        .map(
+          (audit) =>
+              '${audit.id}:${audit.status}:${audit.scoreFinal}:${audit.score}:${audit.startedAt?.millisecondsSinceEpoch}',
+        )
+        .join('|');
+
+    if (_auditItemsFuture == null || _auditItemsSignature != signature) {
+      _auditItemsSignature = signature;
+      _auditItemsFuture = _buildAuditItems(audits);
+    }
+
+    return _auditItemsFuture!;
+  }
+
+  List<_AuditListItem> _applySearch(List<_AuditListItem> items, String rawQuery) {
+    final query = rawQuery.trim().toLowerCase();
+    if (query.isEmpty) return items;
+
+    return items.where((item) {
+      final clientName = item.clientName.toLowerCase();
+      final code = item.audit.formattedCode.toLowerCase();
+      return clientName.contains(query) || code.contains(query);
+    }).toList(growable: false);
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: SizedBox(
+        height: 60,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Transform.translate(
+                offset: const Offset(-6, 0),
+                child: IconButton(
+                  onPressed: _handleBack,
+                  icon: const Icon(
+                    Icons.chevron_left,
+                    size: 28,
+                    color: _brandColor,
+                  ),
                 ),
               ),
             ),
-          );
-        }
-
-        final info = snapshot.data ??
-            const _AuditCardInfo(clientName: 'Cliente sem nome', templateName: 'Template');
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0C1C1C1C),
-                blurRadius: 12,
-                offset: Offset(0, 4),
+            Center(
+              child: Image.asset(
+                'assets/logo-escura.png',
+                height: 24,
+                fit: BoxFit.contain,
               ),
-            ],
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                onPressed: _openNewAudit,
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFEEE9FF),
+                  foregroundColor: _brandColor,
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(Icons.add_circle, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroBlock() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Minhas auditorias',
+            style: _inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: _brandColor,
+              letterSpacing: -0.8,
+            ),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 340),
+            child: Text(
+              'Acompanhe auditorias em andamento, revise auditorias já realizadas ou inicie uma nova.',
+              style: _inter(
+                fontSize: 14,
+                height: 1.6,
+                color: _mutedColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF6F6FA),
               borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AuditDetailPage(auditId: audit.id),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0F171A24),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              style: _inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: _brandDark,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Buscar auditoria ou cliente',
+                hintStyle: _inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF9A9EAE),
+                ),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF9A9EAE)),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuditCard(_AuditListItem item) {
+    final audit = item.audit;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F171A24),
+            blurRadius: 28,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () => _openAuditDetail(audit),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            info.clientName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1C1C1C),
+                            item.clientName,
+                            style: _inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: _brandDark,
+                              letterSpacing: -0.4,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${audit.formattedCode} - ${_formatDate(audit.startedAt)}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: const Color(0xFF8A8FA3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _statusBackgroundColor(audit.status),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              _statusLabel(audit.status),
+                              style: _inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _statusTextColor(audit.status),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _statusBackgroundColor(audit.status),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _statusLabel(audit.status),
-                        style: TextStyle(
-                          color: _statusTextColor(audit.status),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                      const SizedBox(height: 8),
+                      Text(
+                        '${audit.formattedCode} • ${_formatDate(audit.startedAt)}',
+                        style: _inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: _mutedColor,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        _formatTrailingMetric(audit, item.completionPercent),
+                        style: _inter(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: _mutedColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEE9FF),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.chevron_right,
+                      size: 22,
+                      color: Color(0xFF7357D8),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -220,138 +433,119 @@ class _AuditsPageState extends State<AuditsPage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const LoginPage();
+      return const HomePage();
     }
 
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = width >= 900 ? width * 0.16 : (width >= 600 ? 24.0 : 16.0);
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          'Auditorias',
-          style: TextStyle(
-            color: const Color(0xFF1C1C1C),
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ClientsPage()),
-              );
-            },
-            icon: const Icon(Icons.person_outline, color: Color(0xFF39306E)),
-          ),
-          IconButton(
-            onPressed: _isSigningOut ? null : _handleSignOut,
-            icon: const Icon(Icons.logout, color: Color(0xFF39306E)),
-          ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: Color(0xFFE6E6EF)),
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      body: StreamBuilder<List<AuditModel>>(
-        stream: _auditService.getUserAudits(user.uid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Erro ao carregar auditorias.',
-                style: TextStyle(color: const Color(0xFF8A8FA3)),
-              ),
-            );
-          }
-
-          final audits = snapshot.data ?? const <AuditModel>[];
-          if (audits.isEmpty) {
-            return Center(
-              child: Text(
-                'Nenhuma auditoria encontrada.',
-                style: TextStyle(color: const Color(0xFF8A8FA3)),
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: EdgeInsets.fromLTRB(horizontalPadding, 20, horizontalPadding, 92),
-            itemCount: audits.length,
-            itemBuilder: (context, index) {
-              return _buildAuditCard(context, audits[index]);
-            },
-          );
-        },
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xFF7262C2),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1A5A3E8E),
-                    blurRadius: 18,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const NewAuditPage()),
-                    );
-                  },
-                  child: Center(
-                    child: Text(
-                      'Nova auditoria',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+      child: Scaffold(
+        backgroundColor: _bgColor,
+        body: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: Colors.white,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(),
+                    _buildIntroBlock(),
+                  ],
                 ),
               ),
             ),
-          ),
+            Expanded(
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _searchController,
+              builder: (context, searchValue, _) {
+                return StreamBuilder<List<AuditModel>>(
+                  stream: _auditService.getUserAudits(user.uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Erro ao carregar auditorias.',
+                          style: _inter(color: _mutedColor),
+                        ),
+                      );
+                    }
+
+                    final audits = [...(snapshot.data ?? const <AuditModel>[])]
+                      ..sort((a, b) {
+                        final aNumber = a.auditNumber ?? -1;
+                        final bNumber = b.auditNumber ?? -1;
+                        return bNumber.compareTo(aNumber);
+                      });
+
+                    return FutureBuilder<List<_AuditListItem>>(
+                      future: _resolveAuditItemsFuture(audits),
+                      builder: (context, itemsSnapshot) {
+                        final isLoadingItems =
+                            itemsSnapshot.connectionState == ConnectionState.waiting;
+                        final items = _applySearch(
+                          itemsSnapshot.data ?? const [],
+                          searchValue.text,
+                        );
+
+                        if (isLoadingItems) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+                              child: Text(
+                                audits.isEmpty
+                                    ? 'Nenhuma auditoria encontrada.'
+                                    : 'Nenhum resultado para a busca.',
+                                style: _inter(color: _mutedColor),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                          itemCount: items.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 16),
+                          itemBuilder: (context, index) {
+                            return _buildAuditCard(items[index]);
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _AuditCardInfo {
+class _AuditListItem {
+  final AuditModel audit;
   final String clientName;
-  final String templateName;
+  final double completionPercent;
 
-  const _AuditCardInfo({
+  const _AuditListItem({
+    required this.audit,
     required this.clientName,
-    required this.templateName,
+    required this.completionPercent,
   });
 }
-
-

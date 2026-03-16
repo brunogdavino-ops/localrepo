@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -6,13 +6,19 @@ import '../pages/audit_fill_page.dart';
 import '../services/audit_creation_service.dart';
 
 class NewAuditPage extends StatefulWidget {
-  const NewAuditPage({Key? key}) : super(key: key);
+  const NewAuditPage({super.key});
 
   @override
   State<NewAuditPage> createState() => _NewAuditPageState();
 }
 
 class _NewAuditPageState extends State<NewAuditPage> {
+  static const Color _bgColor = Color(0xFFF7F7FB);
+  static const Color _brandColor = Color(0xFF7357D8);
+  static const Color _brandDark = Color(0xFF1B1830);
+  static const Color _mutedColor = Color(0xFF72778A);
+  static const Color _surfaceSoft = Color(0xFFF6F6FA);
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AuditCreationService _creationService = AuditCreationService();
   final TextEditingController _clientSearchController = TextEditingController();
@@ -27,6 +33,23 @@ class _NewAuditPageState extends State<NewAuditPage> {
   bool _isCreating = false;
   List<_ClientOption> _clientResults = const [];
   int _searchRequestId = 0;
+
+  TextStyle _inter({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return TextStyle(
+      fontFamily: 'Inter',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
+  }
 
   @override
   void initState() {
@@ -96,7 +119,7 @@ class _NewAuditPageState extends State<NewAuditPage> {
       return;
     }
 
-    final int requestId = ++_searchRequestId;
+    final requestId = ++_searchRequestId;
     if (query.isEmpty) {
       if (mounted) {
         setState(() {
@@ -210,19 +233,15 @@ class _NewAuditPageState extends State<NewAuditPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            error.message?.toString() ?? 'Nao foi possivel criar a auditoria.',
-            style: TextStyle(),
+            error.message.toString(),
           ),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Nao foi possivel criar a auditoria.',
-            style: TextStyle(),
-          ),
+        const SnackBar(
+          content: Text('Não foi possível criar a auditoria.'),
         ),
       );
     } finally {
@@ -253,7 +272,7 @@ class _NewAuditPageState extends State<NewAuditPage> {
       'set',
       'out',
       'nov',
-      'dez'
+      'dez',
     ];
     final day = date.day.toString().padLeft(2, '0');
     final month = months[date.month - 1];
@@ -261,10 +280,79 @@ class _NewAuditPageState extends State<NewAuditPage> {
     return '$day $month $year';
   }
 
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: SizedBox(
+        height: 60,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Transform.translate(
+                offset: const Offset(-6, 0),
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(
+                    Icons.chevron_left,
+                    size: 28,
+                    color: _brandColor,
+                  ),
+                ),
+              ),
+            ),
+            Center(
+              child: Image.asset(
+                'assets/logo-escura.png',
+                height: 24,
+                fit: BoxFit.contain,
+              ),
+            ),
+            const Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(width: 40, height: 40),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntro() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Nova auditoria',
+            style: _inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: _brandColor,
+              letterSpacing: -0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text(
+              'Selecione o cliente e defina a data para iniciar a auditoria.',
+              style: _inter(
+                fontSize: 14,
+                height: 1.6,
+                color: _mutedColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = width >= 900 ? width * 0.16 : (width >= 600 ? 24.0 : 16.0);
     final canSubmit = _selectedClientRef != null && !_isCreating && !_isLoading;
 
     return GestureDetector(
@@ -275,157 +363,144 @@ class _NewAuditPageState extends State<NewAuditPage> {
         });
       },
       child: Scaffold(
-      backgroundColor: const Color(0xFFF6F5F5),
-      body: SafeArea(
-        child: Column(
+        backgroundColor: _bgColor,
+        body: Column(
           children: [
             Container(
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFE6E6EF),
-                    width: 1,
-                  ),
-                ),
-              ),
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 4),
-              child: SizedBox(
-                height: 40,
-                child: Stack(
-                  alignment: Alignment.center,
+              width: double.infinity,
+              color: Colors.white,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        padding: const EdgeInsets.only(left: 6, right: 8),
-                        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF39306E)),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.center,
-                      child: Image.asset(
-                        'assets/logo-escura.png',
-                        height: 30,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: SizedBox(width: 48, height: 48),
-                    ),
+                    _buildHeader(),
+                    _buildIntro(),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Nova auditoria',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1C1C1C),
-                  ),
                 ),
               ),
             ),
             Expanded(
               child: ListView(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 16),
+                padding: const EdgeInsets.fromLTRB(0, 24, 0, 16),
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE6E6EF)),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0F171A24),
+                          blurRadius: 28,
+                          offset: Offset(0, 10),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F1F6),
-                            borderRadius: BorderRadius.circular(14),
+                            color: _surfaceSoft,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'ID: ${_formatPreviewCode()}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF39306E),
-                                  ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _pickDate,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'ID: ${_formatPreviewCode()}',
+                                        style: _inter(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: _brandColor,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatShortDate(_chosenDate),
+                                      style: _inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: _mutedColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Icon(
+                                      Icons.calendar_month,
+                                      size: 22,
+                                      color: _brandColor,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              Text(
-                                _formatShortDate(_chosenDate),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: const Color(0xFF8A8FA3),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _pickDate,
-                                icon: const Icon(
-                                  Icons.calendar_month_outlined,
-                                  color: Color(0xFF39306E),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         if (_selectedClientRef == null) ...[
-                          TextField(
-                            controller: _clientSearchController,
-                            focusNode: _clientFocusNode,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: const Color(0xFF1C1C1C),
+                          Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: _surfaceSoft,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x0F171A24),
+                                  blurRadius: 24,
+                                  offset: Offset(0, 10),
+                                ),
+                              ],
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'Buscar cliente...',
-                              hintStyle: TextStyle(
-                                color: const Color(0xFF8A8FA3),
+                            child: TextField(
+                              controller: _clientSearchController,
+                              focusNode: _clientFocusNode,
+                              style: _inter(
                                 fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: _brandDark,
                               ),
-                              prefixIcon: const Icon(Icons.search, color: Color(0xFF8A8FA3)),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 14,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(color: Color(0xFFE6E6EF)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF6D4BC3),
-                                  width: 1.5,
+                              decoration: InputDecoration(
+                                hintText: 'Buscar cliente...',
+                                hintStyle: _inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF9A9EAE),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.search,
+                                  color: Color(0xFF9A9EAE),
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
                                 ),
                               ),
                             ),
                           ),
                         ] else ...[
                           Container(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE6E6EF)),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFEEF0F6)),
                             ),
                             child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Expanded(
                                   child: Column(
@@ -433,25 +508,25 @@ class _NewAuditPageState extends State<NewAuditPage> {
                                     children: [
                                       Text(
                                         'Cliente',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: const Color(0xFF8A8FA3),
+                                        style: _inter(
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w500,
+                                          color: _mutedColor,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 8),
                                       Text(
                                         _selectedClientName ?? 'Cliente sem nome',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: const Color(0xFF1C1C1C),
+                                        style: _inter(
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w600,
+                                          color: _brandDark,
+                                          letterSpacing: -0.3,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 10),
                                 TextButton(
                                   onPressed: () {
                                     setState(() {
@@ -462,8 +537,9 @@ class _NewAuditPageState extends State<NewAuditPage> {
                                     });
                                   },
                                   style: TextButton.styleFrom(
+                                    foregroundColor: _brandColor,
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
+                                      horizontal: 8,
                                       vertical: 8,
                                     ),
                                     minimumSize: Size.zero,
@@ -471,10 +547,10 @@ class _NewAuditPageState extends State<NewAuditPage> {
                                   ),
                                   child: Text(
                                     'Trocar',
-                                    style: TextStyle(
-                                      fontSize: 13,
+                                    style: _inter(
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF5A3E8E),
+                                      color: _brandColor,
                                     ),
                                   ),
                                 ),
@@ -483,107 +559,124 @@ class _NewAuditPageState extends State<NewAuditPage> {
                           ),
                         ],
                         if (_selectedClientRef == null && _clientResults.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 280),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE6E6EF)),
-                            ),
-                            child: ListView.separated(
-                              shrinkWrap: true,
-                              itemCount: _clientResults.length,
-                              separatorBuilder: (_, __) => const Divider(
-                                height: 1,
-                                thickness: 1,
-                                color: Color(0xFFE6E6EF),
+                          const SizedBox(height: 16),
+                          ...List.generate(_clientResults.length, (index) {
+                            final client = _clientResults[index];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: index == _clientResults.length - 1 ? 0 : 12,
                               ),
-                              itemBuilder: (context, index) {
-                                final client = _clientResults[index];
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(
-                                    client.name,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: const Color(0xFF1C1C1C),
-                                      fontWeight: FontWeight.w500,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x0F171A24),
+                                      blurRadius: 24,
+                                      offset: Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedClientRef = client.ref;
+                                        _selectedClientName = client.name;
+                                        _clientSearchController.text = client.name;
+                                        _clientResults = const [];
+                                      });
+                                      _clientFocusNode.unfocus();
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 18,
+                                      ),
+                                      child: Text(
+                                        client.name,
+                                        style: _inter(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: _brandDark,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedClientRef = client.ref;
-                                      _selectedClientName = client.name;
-                                      _clientSearchController.text = client.name;
-                                      _clientResults = const [];
-                                    });
-                                    _clientFocusNode.unfocus();
-                                  },
-                                );
-                              },
-                            ),
-                          ),
+                                ),
+                              ),
+                            );
+                          }),
                         ],
                       ],
+                    ),
                     ),
                   ),
                 ],
               ),
             ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 16),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: canSubmit ? const Color(0xFF7262C2) : const Color(0xFFDCDCE6),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: canSubmit ? () => _handleCreate(draft: false) : null,
-                            child: Center(
-                              child: _isCreating
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : Text(
-                                      'Criar auditoria',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: canSubmit
-                                            ? Colors.white
-                                            : const Color(0xFF9A9AB0),
+            if (canSubmit)
+              SafeArea(
+                top: false,
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _brandColor,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x1A5A3E8E),
+                            blurRadius: 18,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: _isCreating
+                              ? null
+                              : () => _handleCreate(draft: false),
+                          child: Center(
+                            child: _isCreating
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
                                       ),
                                     ),
-                            ),
+                                  )
+                                : Text(
+                                    'Criar auditoria',
+                                    style: _inter(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
-    ),
     );
   }
 }

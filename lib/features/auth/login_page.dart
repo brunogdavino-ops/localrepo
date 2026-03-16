@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../audits/audits_page.dart';
+import '../home/home_page.dart';
 
 class _PremiumTextField extends StatelessWidget {
   final String hintText;
@@ -32,7 +32,7 @@ class _PremiumTextField extends StatelessWidget {
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               width: 1,
             ),
           ),
@@ -61,8 +61,6 @@ class _LoginPageState extends State<LoginPage> {
   late FocusNode _emailFocusNode;
   late FocusNode _passwordFocusNode;
   bool _isLoading = false;
-  bool _rememberMe = false;
-
   @override
   void initState() {
     super.initState();
@@ -100,9 +98,8 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // Navigate to AuditsPage on success
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AuditsPage()),
+        MaterialPageRoute(builder: (_) => const HomePage()),
       );
     } catch (e) {
       if (!mounted) return;

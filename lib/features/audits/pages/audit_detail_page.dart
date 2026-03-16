@@ -26,7 +26,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   static const bool _pdfExportEnabled = true;
   static const bool _refreshScoreBeforePdf = true;
 
-  late final Future<_AuditDetailData> _detailFuture;
+  late Future<_AuditDetailData> _detailFuture;
   final AuditPdfService _auditPdfService = AuditPdfService();
   final AuditScoreService _auditScoreService = AuditScoreService();
   String? _loadedAuditStatus;
@@ -38,7 +38,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   @override
   void initState() {
     super.initState();
-    _detailFuture = _loadAuditDetails();
+    _refreshDetail();
   }
 
   @override
@@ -103,8 +103,13 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       answers,
       questionsSnapshot.docs,
     );
-    final overallScore = audit.scoreFinal ?? localOverallScore;
-    final usedOverallScoreFallback = audit.scoreFinal == null;
+    final usedOverallScoreFallback = _isScoreOutOfSync(
+      audit.scoreFinal,
+      localOverallScore,
+    );
+    final overallScore = usedOverallScoreFallback
+        ? localOverallScore
+        : audit.scoreFinal!;
 
     final clientRef = audit.clientRef;
     String clientName = 'Cliente sem nome';
@@ -179,14 +184,19 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       );
       final persistedCategoryScore =
           persistedScoreByCategory[builder.categoryRefPath];
-      if (persistedCategoryScore == null) {
+      if (_isScoreOutOfSync(persistedCategoryScore, localCategoryScore)) {
         categoryFallbackCount += 1;
       }
       return _CategoryGroup(
         categoryRefPath: builder.categoryRefPath,
         categoryName: builder.categoryName,
         categoryOrder: builder.categoryOrder,
-        categoryScore: persistedCategoryScore ?? localCategoryScore,
+        categoryScore: _isScoreOutOfSync(
+              persistedCategoryScore,
+              localCategoryScore,
+            )
+            ? localCategoryScore
+            : persistedCategoryScore!,
         items: builder.items,
       );
     }).toList();
@@ -310,6 +320,11 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     return double.parse(score.toStringAsFixed(1));
   }
 
+  bool _isScoreOutOfSync(double? persistedScore, double localScore) {
+    if (persistedScore == null) return true;
+    return (persistedScore - localScore).abs() > 0.05;
+  }
+
   bool _isAdminRole() {
     return _currentUserRole == 'admin';
   }
@@ -336,7 +351,11 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
     );
   }
 
-  void _handleContinueEditing([String? status]) {
+  void _refreshDetail() {
+    _detailFuture = _loadAuditDetails();
+  }
+
+  Future<void> _handleContinueEditing([String? status]) async {
     final currentStatus = status ?? _loadedAuditStatus;
     if (!_canContinueEditing(currentStatus)) {
       ScaffoldMessenger.of(
@@ -345,9 +364,26 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
       return;
     }
 
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => AuditFillPage(auditId: widget.auditId)),
     );
+
+    if (!mounted) return;
+    try {
+      await _auditScoreService.computeAndPersistScore(widget.auditId);
+    } on FirebaseFunctionsException catch (error) {
+      debugPrint(
+        'computeAndPersistAuditScore on return from edit failed (${error.code}): ${error.message}',
+      );
+    } catch (error) {
+      debugPrint(
+        'computeAndPersistAuditScore on return from edit unexpected failure: $error',
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _refreshDetail();
+    });
   }
 
   void _toggleHeaderMenu() {
@@ -822,11 +858,15 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(
-                  Icons.arrow_back_ios_new,
-                  color: Color(0xFF39306E),
+              Transform.translate(
+                offset: const Offset(-6, 0),
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(
+                    Icons.chevron_left,
+                    size: 28,
+                    color: Color(0xFF7357D8),
+                  ),
                 ),
               ),
               Expanded(
@@ -836,7 +876,7 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
                     opacity: _isHeaderMenuOpen ? 0.28 : 1,
                     child: Image.asset(
                       'assets/logo-escura.png',
-                      height: 28,
+                      height: 24,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -1156,7 +1196,7 @@ class _AuditCategoryCardState extends State<_AuditCategoryCard> {
                               _isExpanded
                                   ? Icons.expand_less_rounded
                                   : Icons.expand_more_rounded,
-                              color: const Color(0xFF72778A),
+                              color: const Color(0xFF7357D8),
                             ),
                           ],
                         ),

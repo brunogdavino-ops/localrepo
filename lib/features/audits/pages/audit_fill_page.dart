@@ -133,9 +133,7 @@ class _AuditFillPageState extends State<AuditFillPage> {
           clientName = client;
         }
       }
-      _headerTitle = clientName == null
-          ? defaultTitle
-          : clientName;
+      _headerTitle = clientName ?? defaultTitle;
 
       final categoriesSnapshot = await _firestore
           .collection('categories')
@@ -1429,6 +1427,12 @@ class _AuditFillPageState extends State<AuditFillPage> {
         actions: [
           IconButton(
             onPressed: _showSaveProgressSnack,
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFFEEE9FF),
+              foregroundColor: _brandAccentColor,
+              minimumSize: const Size(32, 32),
+              padding: EdgeInsets.zero,
+            ),
             icon: const Icon(Icons.save_outlined, color: _brandAccentColor),
           ),
         ],
