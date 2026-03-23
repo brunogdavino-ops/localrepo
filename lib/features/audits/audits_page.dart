@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../home/home_page.dart';
+import '../home/home_entry_page.dart';
 import 'models/audit_model.dart';
 import 'pages/audit_detail_page.dart';
 import 'pages/new_audit_page.dart';
@@ -77,7 +77,7 @@ class _AuditsPageState extends State<AuditsPage> {
     }
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomePage()),
+      MaterialPageRoute(builder: (_) => const HomeEntryPage()),
     );
   }
 
@@ -135,35 +135,45 @@ class _AuditsPageState extends State<AuditsPage> {
   }
 
   Future<_AuditListItem> _loadAuditListItem(AuditModel audit) async {
-    final clientSnapshot = await audit.clientRef.get();
-    final clientData = clientSnapshot.data() as Map<String, dynamic>?;
-    final clientName = (clientData?['name'] as String?)?.trim();
+    try {
+      final clientSnapshot = await audit.clientRef.get();
+      final clientData = clientSnapshot.data() as Map<String, dynamic>?;
+      final clientName = (clientData?['name'] as String?)?.trim();
 
-    final answersSnapshot = await FirebaseFirestore.instance
-        .collection('audits')
-        .doc(audit.id)
-        .collection('answers')
-        .get();
+      final answersSnapshot = await FirebaseFirestore.instance
+          .collection('audits')
+          .doc(audit.id)
+          .collection('answers')
+          .get();
 
-    final totalAnswers = answersSnapshot.docs.length;
-    final answeredCount = answersSnapshot.docs.where((doc) {
-      final data = doc.data();
-      final response = ((data['response'] as String?) ?? (data['value'] as String?))
-          ?.trim();
-      return response != null && response.isNotEmpty;
-    }).length;
+      final totalAnswers = answersSnapshot.docs.length;
+      final answeredCount = answersSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final response =
+            ((data['response'] as String?) ?? (data['value'] as String?))
+                ?.trim();
+        return response != null && response.isNotEmpty;
+      }).length;
 
-    final completionPercent = totalAnswers == 0
-        ? 0.0
-        : (answeredCount / totalAnswers) * 100;
+      final completionPercent = totalAnswers == 0
+          ? 0.0
+          : (answeredCount / totalAnswers) * 100;
 
-    return _AuditListItem(
-      audit: audit,
-      clientName: (clientName == null || clientName.isEmpty)
-          ? 'Cliente sem nome'
-          : clientName,
-      completionPercent: completionPercent.clamp(0, 100),
-    );
+      return _AuditListItem(
+        audit: audit,
+        clientName: (clientName == null || clientName.isEmpty)
+            ? 'Cliente sem nome'
+            : clientName,
+        completionPercent: completionPercent.clamp(0, 100),
+      );
+    } catch (error) {
+      debugPrint('Failed to enrich audit ${audit.id}: $error');
+      return _AuditListItem(
+        audit: audit,
+        clientName: 'Cliente indisponível',
+        completionPercent: 0,
+      );
+    }
   }
 
   Future<_AuditListItem> _getAuditListItem(AuditModel audit) {
@@ -433,7 +443,7 @@ class _AuditsPageState extends State<AuditsPage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const HomePage();
+      return const HomeEntryPage();
     }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -499,6 +509,19 @@ class _AuditsPageState extends State<AuditsPage> {
 
                         if (isLoadingItems) {
                           return const Center(child: CircularProgressIndicator());
+                        }
+
+                        if (itemsSnapshot.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+                              child: Text(
+                                'Erro ao montar a lista de auditorias.',
+                                style: _inter(color: _mutedColor),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          );
                         }
 
                         if (items.isEmpty) {

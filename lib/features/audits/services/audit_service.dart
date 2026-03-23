@@ -11,10 +11,7 @@ class AuditService {
 
     final Query<Map<String, dynamic>> query = role == 'admin'
         ? firestore.collection('audits').orderBy('updated_at', descending: true)
-        : firestore
-            .collection('audits')
-            .where('auditorRef', isEqualTo: userDocRef)
-            .orderBy('updated_at', descending: true);
+        : firestore.collection('audits').where('auditorRef', isEqualTo: userDocRef);
 
     yield* query.snapshots().map((snapshot) {
       return snapshot.docs

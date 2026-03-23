@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../home/home_page.dart';
+import '../home/home_entry_page.dart';
 
 class _PremiumTextField extends StatelessWidget {
   final String hintText;
@@ -99,7 +99,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const HomeEntryPage()),
       );
     } catch (e) {
       if (!mounted) return;

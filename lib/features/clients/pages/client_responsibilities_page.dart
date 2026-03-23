@@ -5,13 +5,17 @@ import 'package:flutter/material.dart';
 import '../../audits/services/active_template_service.dart';
 
 class ClientResponsibilitiesPage extends StatefulWidget {
-  final String clientId;
+  final String? clientId;
   final String clientName;
+  final Set<String>? initialClientQuestionPaths;
+  final bool persistOnSave;
 
   const ClientResponsibilitiesPage({
     super.key,
-    required this.clientId,
+    this.clientId,
     required this.clientName,
+    this.initialClientQuestionPaths,
+    this.persistOnSave = true,
   });
 
   @override
@@ -22,7 +26,7 @@ class ClientResponsibilitiesPage extends StatefulWidget {
 class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ActiveTemplateService _activeTemplateService = ActiveTemplateService();
-  final Set<String> _operatorQuestionPaths = <String>{};
+  final Set<String> _clientQuestionPaths = <String>{};
   final Set<String> _expandedCategoryPaths = <String>{};
   final List<_CategorySection> _sections = <_CategorySection>[];
 
@@ -53,23 +57,34 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
       final role = (userSnapshot.data()?['role'] as String?)?.trim().toLowerCase();
       _isAdmin = role == 'admin';
 
-      final clientRef = _firestore.collection('clients').doc(widget.clientId);
-      final clientSnapshot = await clientRef.get();
-      if (!clientSnapshot.exists) {
-        throw StateError('Cliente nao encontrado.');
-      }
-
-      final clientData = clientSnapshot.data() ?? <String, dynamic>{};
-      final responsibilityMap =
-          (clientData['responsibilityMap'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-
-      _operatorQuestionPaths
+      _clientQuestionPaths
         ..clear()
-        ..addAll(
+        ..addAll(widget.initialClientQuestionPaths ?? const <String>{});
+
+      final persistedOperatorQuestionPaths = <String>{};
+
+      if (widget.persistOnSave) {
+        final clientId = widget.clientId;
+        if (clientId == null || clientId.isEmpty) {
+          throw StateError('Cliente nao informado.');
+        }
+
+        final clientRef = _firestore.collection('clients').doc(clientId);
+        final clientSnapshot = await clientRef.get();
+        if (!clientSnapshot.exists) {
+          throw StateError('Cliente nao encontrado.');
+        }
+
+        final clientData = clientSnapshot.data() ?? <String, dynamic>{};
+        final responsibilityMap =
+            (clientData['responsibilityMap'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+
+        persistedOperatorQuestionPaths.addAll(
           responsibilityMap.entries
               .where((entry) => entry.value == 'operator')
               .map((entry) => entry.key),
         );
+      }
 
       final templateRef = await _activeTemplateService.resolveActiveTemplateRef();
 
@@ -127,6 +142,17 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
       }).toList()
         ..sort((a, b) => a.order.compareTo(b.order));
 
+      final allQuestionPaths = <String>{
+        for (final section in sections)
+          for (final question in section.questions) question.path,
+      };
+
+      if (widget.persistOnSave) {
+        _clientQuestionPaths
+          ..clear()
+          ..addAll(allQuestionPaths.difference(persistedOperatorQuestionPaths));
+      }
+
       if (!mounted) return;
       setState(() {
         _sections
@@ -154,9 +180,20 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
     });
 
     try {
-      final responsibilityMap = <String, String>{
-        for (final questionPath in _operatorQuestionPaths) questionPath: 'operator',
+      final allQuestionPaths = <String>{
+        for (final section in _sections)
+          for (final question in section.questions) question.path,
       };
+      final responsibilityMap = <String, String>{
+        for (final questionPath in allQuestionPaths)
+          if (!_clientQuestionPaths.contains(questionPath)) questionPath: 'operator',
+      };
+
+      if (!widget.persistOnSave) {
+        if (!mounted) return;
+        Navigator.of(context).pop(Set<String>.from(_clientQuestionPaths));
+        return;
+      }
 
       await _firestore.collection('clients').doc(widget.clientId).update({
         'responsibilityMap': responsibilityMap,
@@ -168,7 +205,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Responsabilidades salvas com sucesso.')),
       );
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(Set<String>.from(_clientQuestionPaths));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,7 +224,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
     final numbers = <int>[];
     for (final section in _sections) {
       for (final question in section.questions) {
-        if (_operatorQuestionPaths.contains(question.path)) {
+        if (_clientQuestionPaths.contains(question.path)) {
           numbers.add(question.order);
         }
       }
@@ -205,13 +242,13 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
           title: const Text('Confirmar responsabilidades'),
           content: selectedNumbers.isEmpty
               ? const Text(
-                  'Nenhuma pergunta foi marcada para Operadora. Todas ficarao como Cliente por padrao.',
+                  'Nenhuma pergunta foi marcada para Cliente. Todas ficarao como Operadora por padrao.',
                 )
               : SizedBox(
                   width: 320,
                   child: SingleChildScrollView(
                     child: Text(
-                      'Perguntas marcadas para Operadora:\n${selectedNumbers.join(', ')}',
+                      'Perguntas marcadas para Cliente:\n${selectedNumbers.join(', ')}',
                     ),
                   ),
                 ),
@@ -241,7 +278,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
   bool _isCategoryAllSelected(_CategorySection section) {
     if (section.questions.isEmpty) return false;
     for (final question in section.questions) {
-      if (!_operatorQuestionPaths.contains(question.path)) {
+      if (!_clientQuestionPaths.contains(question.path)) {
         return false;
       }
     }
@@ -252,7 +289,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
     if (section.questions.isEmpty) return false;
     int selectedCount = 0;
     for (final question in section.questions) {
-      if (_operatorQuestionPaths.contains(question.path)) {
+      if (_clientQuestionPaths.contains(question.path)) {
         selectedCount++;
       }
     }
@@ -263,9 +300,9 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
     setState(() {
       for (final question in section.questions) {
         if (selectAll) {
-          _operatorQuestionPaths.add(question.path);
+          _clientQuestionPaths.add(question.path);
         } else {
-          _operatorQuestionPaths.remove(question.path);
+          _clientQuestionPaths.remove(question.path);
         }
       }
     });
@@ -303,7 +340,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Marque as perguntas da Operadora. As nao marcadas ficam como Cliente por padrao.',
+                      'Marque as perguntas do Cliente. As nao marcadas ficam como Operadora por padrao.',
                       style: TextStyle(
                         fontSize: 12.5,
                         color: Color(0xFF8A8FA3),
@@ -393,7 +430,7 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
                             },
                             children: section.questions.map((question) {
                               final selected =
-                                  _operatorQuestionPaths.contains(question.path);
+                                  _clientQuestionPaths.contains(question.path);
                               return Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 4,
@@ -406,11 +443,11 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
                                       : () {
                                           setState(() {
                                             if (selected) {
-                                              _operatorQuestionPaths.remove(
+                                              _clientQuestionPaths.remove(
                                                 question.path,
                                               );
                                             } else {
-                                              _operatorQuestionPaths.add(
+                                              _clientQuestionPaths.add(
                                                 question.path,
                                               );
                                             }
@@ -451,12 +488,12 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
                                                 : (value) {
                                                     setState(() {
                                                       if (value == true) {
-                                                        _operatorQuestionPaths
+                                                        _clientQuestionPaths
                                                             .add(
                                                           question.path,
                                                         );
                                                       } else {
-                                                        _operatorQuestionPaths
+                                                        _clientQuestionPaths
                                                             .remove(
                                                           question.path,
                                                         );
@@ -495,8 +532,8 @@ class _ClientResponsibilitiesPageState extends State<ClientResponsibilitiesPage>
                                               const SizedBox(height: 4),
                                               Text(
                                                 selected
-                                                    ? 'Operadora'
-                                                    : 'Cliente',
+                                                    ? 'Cliente'
+                                                    : 'Operadora',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: selected

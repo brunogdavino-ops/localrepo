@@ -88,4 +88,32 @@ class AuditCreationService {
 
     return auditDocRef.id;
   }
+
+  Future<String> createOrReuseAudit({
+    required String uid,
+    required DocumentReference clientRef,
+    required DateTime chosenDate,
+    required bool draft,
+  }) async {
+    final auditorRef = _firestore.collection('users').doc(uid);
+    final startDate = DateTime(chosenDate.year, chosenDate.month, chosenDate.day);
+    final existingSnapshot = await _firestore
+        .collection('audits')
+        .where('auditorRef', isEqualTo: auditorRef)
+        .where('clientRef', isEqualTo: clientRef)
+        .where('startedAt', isEqualTo: Timestamp.fromDate(startDate))
+        .limit(1)
+        .get();
+
+    if (existingSnapshot.docs.isNotEmpty) {
+      return existingSnapshot.docs.first.id;
+    }
+
+    return createAudit(
+      uid: uid,
+      clientRef: clientRef,
+      chosenDate: startDate,
+      draft: draft,
+    );
+  }
 }

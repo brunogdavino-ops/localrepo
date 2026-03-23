@@ -1,0 +1,1391 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: "#7357D8",
+              soft: "#EEE9FF",
+              surface: "#F5F1FF",
+              dark: "#1B1830",
+              darkAlt: "#171A24",
+              glow: "#4E38A8"
+            },
+            neutral: {
+              0: "#FFFFFF",
+              25: "#FCFCFE",
+              50: "#F6F6FA",
+              100: "#EEEEF5",
+              200: "#DFE0EA",
+              300: "#C7C9D6",
+              400: "#9A9EAE",
+              500: "#72778A",
+              700: "#34384A",
+              900: "#171A24"
+            },
+            success: {
+              main: "#22A861",
+              soft: "#E8F7EF"
+            },
+            warning: {
+              main: "#D9921A",
+              soft: "#FFF3DF"
+            },
+            error: {
+              main: "#D64545",
+              soft: "#FDEBEC"
+            },
+            info: {
+              main: "#2F6FDE",
+              soft: "#EAF1FF"
+            }
+          },
+          fontFamily: {
+            sans: ["Inter", "system-ui", "sans-serif"]
+          },
+          boxShadow: {
+            soft: "0 8px 30px rgba(23, 26, 36, 0.06)",
+            card: "0 14px 40px rgba(83, 66, 154, 0.08)"
+          },
+          borderRadius: {
+            md: "14px",
+            lg: "20px",
+            xl: "28px"
+          },
+          backgroundImage: {
+            "hero-glow": "radial-gradient(circle at top, rgba(115, 87, 216, 0.22), transparent 35%)",
+            "login-glow": "radial-gradient(circle at center, rgba(115, 87, 216, 0.18), transparent 22%)",
+            "splash-gradient": "radial-gradient(circle at center, rgba(78, 56, 168, 0.22), transparent 18%), linear-gradient(180deg, #1B1830 0%, #171A24 100%)"
+          }
+        }
+      }
+    };
+  </script>
+  <title>Artezi Design System V3</title>
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+    body {
+      min-height: 100vh;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+    }
+    .ds-checkbox-on {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: #A55AE9;
+      color: #FFFFFF;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 700;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 1px rgba(165, 90, 233, 0.06);
+    }
+    .ds-checkbox-off {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: #FFFFFF;
+      color: #7E8798;
+      border: 1px solid #D7DAE5;
+      font-size: 16px;
+      line-height: 1;
+      pointer-events: none;
+    }
+    .ds-checkbox-disabled {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: #F1F3F8;
+      color: #9EA6B5;
+      border: 1px solid #D7DAE5;
+      font-size: 16px;
+      line-height: 1;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-neutral-50 font-sans text-neutral-900 antialiased">
+  <header class="sticky top-0 z-50 border-b border-neutral-200/80 bg-white/88 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-6">
+      <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand.surface text-brand-primary shadow-soft">
+          <span class="material-symbols-outlined text-[22px]">verified</span>
+        </div>
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-[0.24em] text-brand-primary">Artezi</p>
+          <p class="text-xs text-neutral-500">Design System V3</p>
+        </div>
+      </div>
+      <nav class="hidden items-center gap-8 md:flex">
+        <a class="text-sm font-medium text-neutral-500 transition hover:text-brand-primary" href="#visao">Visão</a>
+        <a class="text-sm font-medium text-neutral-500 transition hover:text-brand-primary" href="#logos">Logos</a>
+        <a class="text-sm font-medium text-neutral-500 transition hover:text-brand-primary" href="#cores">Cores</a>
+        <a class="text-sm font-medium text-neutral-500 transition hover:text-brand-primary" href="#tipografia">Tipografia</a>
+        <a class="text-sm font-medium text-neutral-500 transition hover:text-brand-primary" href="#icones">Ícones</a>
+        <a class="text-sm font-medium text-neutral-500 transition hover:text-brand-primary" href="#componentes">Componentes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
+    <section id="visao" class="mb-16 overflow-hidden rounded-[32px] bg-hero-glow bg-neutral-900 px-6 py-10 text-white shadow-card md:px-10 md:py-14">
+      <div class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div class="max-w-2xl">
+          <span class="mb-4 inline-flex items-center rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
+            Base atual + evolução premium
+          </span>
+          <h1 class="max-w-xl text-4xl font-extrabold leading-tight md:text-5xl">
+            Documentação inicial do <span class="text-brand-soft">Design System Artezi</span>
+          </h1>
+          <p class="mt-5 max-w-2xl text-base leading-7 text-white/72 md:text-lg">
+            Esta primeira versão em HTML preserva a identidade visual já reconhecível do produto,
+            mas organiza foundations e componentes com mais consistência, acabamento e lógica de sistema.
+          </p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <span class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/84">Mobile-first</span>
+            <span class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/84">B2B sério</span>
+            <span class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/84">Checklist-first</span>
+            <span class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/84">Premium funcional</span>
+          </div>
+        </div>
+
+        <div class="rounded-[28px] border border-white/10 bg-white/6 p-4 backdrop-blur-sm">
+          <div class="mx-auto max-w-[320px] rounded-[28px] border border-white/10 bg-splash-gradient p-5 shadow-card">
+            <div class="mb-10 pt-5 text-center">
+              <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-brand-primary/15 text-brand-soft">
+                <span class="material-symbols-outlined text-[34px]">task_alt</span>
+              </div>
+              <h3 class="text-3xl font-semibold tracking-[0.22em] text-white">ARTEZI</h3>
+              <p class="mt-2 text-xs uppercase tracking-[0.3em] text-white/55">Auditoria em alimentos</p>
+            </div>
+            <div class="space-y-4">
+              <div class="rounded-[20px] border border-white/10 bg-white/5 px-5 py-4 text-base text-white/55">Email</div>
+              <div class="rounded-[20px] border border-white/10 bg-white/5 px-5 py-4 text-base text-white/55">Senha</div>
+              <button class="w-full rounded-[20px] bg-brand-primary px-5 py-4 text-lg font-semibold text-white shadow-card">
+                Entrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-16 grid gap-6 md:grid-cols-3">
+      <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-soft">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-brand-primary">O que manter</p>
+        <h2 class="text-xl font-bold text-neutral-900">Base visual já reconhecida</h2>
+        <p class="mt-3 text-sm leading-6 text-neutral-500">
+          Roxo como assinatura, grandes CTAs, cards claros, campos amplos e estrutura objetiva.
+        </p>
+      </div>
+      <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-soft">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-brand-primary">O que evoluir</p>
+        <h2 class="text-xl font-bold text-neutral-900">Mais consistência e acabamento</h2>
+        <p class="mt-3 text-sm leading-6 text-neutral-500">
+          Top bars, inputs, estados, overlays e lógica visual de checklist precisam virar padrão.
+        </p>
+      </div>
+      <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-soft">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-brand-primary">Objetivo</p>
+        <h2 class="text-xl font-bold text-neutral-900">Sistema pronto para escalar</h2>
+        <p class="mt-3 text-sm leading-6 text-neutral-500">
+          Menos improviso de tela a tela e mais reutilização entre cadastro, execução, revisão e relatório.
+        </p>
+      </div>
+    </section>
+
+    <section id="logos" class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Marca</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Sistema de logos</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          A Artezi passa a ter três assinaturas oficiais no Design System. Cada uma deve ser usada conforme contexto, tamanho disponível e objetivo da tela.
+        </p>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-3">
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <div class="rounded-[24px] bg-splash-gradient p-6 text-center">
+            <div class="mx-auto flex min-h-[280px] max-w-[280px] items-center justify-center">
+              <img src="./logo-artezi.png" alt="Logo institucional completa da Artezi" class="max-h-[240px] w-full object-contain" />
+            </div>
+          </div>
+          <div class="mt-5">
+            <h3 class="text-xl font-semibold text-neutral-900">Logo institucional completa</h3>
+            <p class="mt-2 text-sm leading-6 text-neutral-500">
+              Versão principal da marca para momentos institucionais e telas de entrada.
+            </p>
+            <div class="mt-4 space-y-2 text-sm text-neutral-600">
+              <p><span class="font-semibold text-neutral-900">Usar em:</span> splash, login e materiais institucionais</p>
+              <p><span class="font-semibold text-neutral-900">Evitar em:</span> headers pequenos e espaços compactos</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <div class="rounded-[24px] bg-neutral-50 p-6">
+            <div class="flex min-h-[184px] items-center justify-center rounded-[20px] bg-white px-6 py-8 shadow-[inset_0_0_0_1px_rgba(213,215,224,0.7)]">
+              <img src="./logo-escura.png" alt="Logo horizontal da Artezi" class="max-h-[132px] w-full object-contain" />
+            </div>
+          </div>
+          <div class="mt-5">
+            <h3 class="text-xl font-semibold text-neutral-900">Logo horizontal</h3>
+            <p class="mt-2 text-sm leading-6 text-neutral-500">
+              Melhor formato para cabeçalhos com branding, documentação e contextos onde a marca precisa aparecer com boa leitura e menor altura.
+            </p>
+            <div class="mt-4 space-y-2 text-sm text-neutral-600">
+              <p><span class="font-semibold text-neutral-900">Usar em:</span> top bars branded e apresentações do sistema</p>
+              <p><span class="font-semibold text-neutral-900">Evitar em:</span> áreas muito estreitas ou onde o título da tela já é dominante</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <div class="rounded-[24px] bg-neutral-900 p-6">
+            <div class="mx-auto flex h-52 max-w-[220px] items-center justify-center rounded-[24px] bg-black/10 p-6">
+              <img src="./logo-artezi-icon.png" alt="Logo símbolo da Artezi" class="max-h-[150px] w-full object-contain" />
+            </div>
+          </div>
+          <div class="mt-5">
+            <h3 class="text-xl font-semibold text-neutral-900">Logo símbolo</h3>
+            <p class="mt-2 text-sm leading-6 text-neutral-500">
+              Versão compacta da marca para contextos reduzidos, app mark, ícone visual de marca e superfícies em que o nome não precisa aparecer.
+            </p>
+            <div class="mt-4 space-y-2 text-sm text-neutral-600">
+              <p><span class="font-semibold text-neutral-900">Usar em:</span> ícones de marca, atalhos, áreas compactas e elementos reduzidos</p>
+              <p><span class="font-semibold text-neutral-900">Evitar em:</span> telas em que a leitura completa da marca seja importante</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="rounded-2xl bg-neutral-50 p-5">
+            <p class="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Aplicação recomendada</p>
+            <p class="font-semibold text-neutral-900">Splash e login</p>
+            <p class="mt-2 text-sm leading-6 text-neutral-500">Usar a logo institucional completa sobre o gradiente oficial da marca.</p>
+          </div>
+          <div class="rounded-2xl bg-neutral-50 p-5">
+            <p class="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Aplicação recomendada</p>
+            <p class="font-semibold text-neutral-900">Top bar com branding</p>
+            <p class="mt-2 text-sm leading-6 text-neutral-500">Usar preferencialmente a logo horizontal quando a marca precisar aparecer no topo.</p>
+          </div>
+          <div class="rounded-2xl bg-neutral-50 p-5">
+            <p class="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Aplicação recomendada</p>
+            <p class="font-semibold text-neutral-900">Espaços compactos</p>
+            <p class="mt-2 text-sm leading-6 text-neutral-500">Usar a logo símbolo em elementos reduzidos e onde o contexto já deixa claro que é a Artezi.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cores" class="mb-16">
+      <div class="mb-8 flex items-end justify-between gap-4">
+        <div>
+          <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Foundations</p>
+          <h2 class="text-3xl font-bold text-neutral-900">Paleta de cores</h2>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+            A nova paleta mantém a assinatura roxa da Artezi, mas organiza melhor brand, neutros,
+            feedbacks e estados de domínio.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <h3 class="mb-5 text-lg font-semibold text-neutral-900">Brand e superfícies</h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="rounded-xl border border-neutral-200 overflow-hidden">
+              <div class="h-24 bg-brand-primary"></div>
+              <div class="p-4">
+                <p class="font-semibold">Brand Primary</p>
+                <p class="mt-1 text-sm text-neutral-500">Ações principais e foco</p>
+                <p class="mt-3 text-sm font-medium text-brand-primary">#7357D8</p>
+              </div>
+            </div>
+            <div class="rounded-xl border border-neutral-200 overflow-hidden">
+              <div class="h-24 bg-brand-soft"></div>
+              <div class="p-4">
+                <p class="font-semibold">Brand Soft</p>
+                <p class="mt-1 text-sm text-neutral-500">Fundos suaves e tonal surfaces</p>
+                <p class="mt-3 text-sm font-medium text-brand-primary">#EEE9FF</p>
+              </div>
+            </div>
+            <div class="rounded-xl border border-neutral-200 overflow-hidden">
+              <div class="h-24 bg-neutral-50"></div>
+              <div class="p-4">
+                <p class="font-semibold">Page Background</p>
+                <p class="mt-1 text-sm text-neutral-500">Base neutra das telas claras</p>
+                <p class="mt-3 text-sm font-medium text-brand-primary">#F6F6FA</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <h3 class="mb-5 text-lg font-semibold text-neutral-900">Splash, login, feedback e status</h3>
+          <div class="space-y-4">
+            <div class="overflow-hidden rounded-2xl border border-neutral-200">
+              <div class="h-28 bg-splash-gradient"></div>
+              <div class="p-4">
+                <p class="font-semibold text-neutral-900">Gradiente institucional</p>
+                <p class="mt-1 text-sm text-neutral-500">Uso: splash screen, login e momentos de marca</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <span class="rounded-full bg-brand-surface px-3 py-1 text-xs font-semibold text-brand-primary">#1B1830</span>
+                  <span class="rounded-full bg-brand-surface px-3 py-1 text-xs font-semibold text-brand-primary">#171A24</span>
+                  <span class="rounded-full bg-brand-surface px-3 py-1 text-xs font-semibold text-brand-primary">Glow #4E38A8</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between rounded-2xl bg-success-soft px-4 py-4">
+              <div>
+                <p class="font-semibold text-success-main">Success</p>
+                <p class="text-sm text-neutral-500">Conforme, concluída, sucesso de ação</p>
+              </div>
+              <span class="rounded-full border border-success-main/15 bg-white px-3 py-1 text-sm font-semibold text-success-main">#22A861</span>
+            </div>
+            <div class="flex items-center justify-between rounded-2xl bg-warning-soft px-4 py-4">
+              <div>
+                <p class="font-semibold text-warning-main">Warning</p>
+                <p class="text-sm text-neutral-500">Pendente, atenção, parcial</p>
+              </div>
+              <span class="rounded-full border border-warning-main/15 bg-white px-3 py-1 text-sm font-semibold text-warning-main">#D9921A</span>
+            </div>
+            <div class="flex items-center justify-between rounded-2xl bg-error-soft px-4 py-4">
+              <div>
+                <p class="font-semibold text-error-main">Error</p>
+                <p class="text-sm text-neutral-500">Não conforme, falha, bloqueio</p>
+              </div>
+              <span class="rounded-full border border-error-main/15 bg-white px-3 py-1 text-sm font-semibold text-error-main">#D64545</span>
+            </div>
+            <div class="flex items-center justify-between rounded-2xl bg-info-soft px-4 py-4">
+              <div>
+                <p class="font-semibold text-info-main">Info</p>
+                <p class="text-sm text-neutral-500">Revisão, processamento, informação</p>
+              </div>
+              <span class="rounded-full border border-info-main/15 bg-white px-3 py-1 text-sm font-semibold text-info-main">#2F6FDE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tipografia" class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Foundations</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Tipografia</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          A escala tipográfica foi refinada para melhorar hierarquia em títulos de tela, cards e conteúdos densos como checklist e resumo.
+        </p>
+      </div>
+
+      <div class="rounded-[24px] border border-neutral-200 bg-white p-8 shadow-soft">
+        <div class="space-y-8">
+          <div class="flex flex-col gap-4 border-b border-neutral-100 pb-6 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 class="text-4xl font-extrabold leading-tight text-neutral-900">Heading Large</h1>
+              <p class="mt-2 text-sm text-neutral-500">Uso: títulos principais de tela</p>
+            </div>
+            <div class="text-sm text-neutral-500 md:text-right">
+              <p class="font-semibold text-brand-primary">Inter ExtraBold</p>
+              <p>32px / 40px</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4 border-b border-neutral-100 pb-6 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 class="text-2xl font-bold text-neutral-900">Title Medium</h2>
+              <p class="mt-2 text-sm text-neutral-500">Uso: títulos de cards, seções e blocos internos</p>
+            </div>
+            <div class="text-sm text-neutral-500 md:text-right">
+              <p class="font-semibold text-brand-primary">Inter SemiBold</p>
+              <p>20px / 28px</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4 border-b border-neutral-100 pb-6 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p class="text-base leading-7 text-neutral-900">
+                Body Medium: texto principal de formulários, descrições, resumos e conteúdos de checklist.
+              </p>
+            </div>
+            <div class="text-sm text-neutral-500 md:text-right">
+              <p class="font-semibold text-brand-primary">Inter Regular</p>
+              <p>16px / 24px</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-[0.22em] text-neutral-500">Label Small</p>
+              <p class="mt-2 text-sm text-neutral-500">Uso: labels, metadados e textos auxiliares</p>
+            </div>
+            <div class="text-sm text-neutral-500 md:text-right">
+              <p class="font-semibold text-brand-primary">Inter SemiBold</p>
+              <p>12px / 16px</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="icones" class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Foundations</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Iconografia</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          A base recomendada para a Artezi segue Material Symbols Outlined, alinhada ao app atual e refinada para um uso mais consistente em navegação, checklist, ações e estados.
+        </p>
+      </div>
+
+      <div class="space-y-6">
+        <div class="grid gap-6 lg:grid-cols-2">
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Tamanhos oficiais</p>
+            <div class="grid gap-4 sm:grid-cols-3">
+              <div class="rounded-2xl border border-neutral-200 bg-neutral-25 p-4 text-center">
+                <span class="material-symbols-outlined text-[16px] text-neutral-700">edit</span>
+                <p class="mt-3 font-semibold text-neutral-900">Small</p>
+                <p class="text-sm text-neutral-500">16px</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 bg-neutral-25 p-4 text-center">
+                <span class="material-symbols-outlined text-[20px] text-neutral-700">edit</span>
+                <p class="mt-3 font-semibold text-neutral-900">Medium</p>
+                <p class="text-sm text-neutral-500">20px</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 bg-neutral-25 p-4 text-center">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">edit</span>
+                <p class="mt-3 font-semibold text-neutral-900">Large</p>
+                <p class="text-sm text-neutral-500">24px</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Exemplo de uso no produto</p>
+            <div class="rounded-[24px] border border-neutral-200 bg-neutral-25 p-5">
+              <div class="mb-5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <button class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-brand-primary shadow-soft">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <div>
+                    <p class="text-lg font-semibold text-neutral-900">Auditoria: Villa Lobos</p>
+                    <p class="text-sm text-neutral-500">Top action + ações contextuais</p>
+                  </div>
+                </div>
+                <button class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-brand-primary shadow-soft">
+                  <span class="material-symbols-outlined">save</span>
+                </button>
+              </div>
+
+              <div class="space-y-3">
+                <div class="flex flex-wrap gap-3">
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                    <span class="material-symbols-outlined">remove_circle</span>
+                  </button>
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                    <span class="material-symbols-outlined">visibility_off</span>
+                  </button>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-success-main/20 bg-success-soft text-success-main">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-error-main/20 bg-error-soft text-error-main">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#D7DBE6] bg-[#F3F5F9] text-[#7E8798]">
+                    <span class="material-symbols-outlined">remove_circle</span>
+                  </button>
+                  <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#D9E3F8] bg-[#EEF4FF] text-[#4B79D8]">
+                    <span class="material-symbols-outlined">visibility_off</span>
+                  </button>
+                  <button class="ml-auto flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-500">
+                    <span class="material-symbols-outlined">photo_camera</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <div class="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p class="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Biblioteca principal</p>
+              <h3 class="text-lg font-semibold text-neutral-900">Ícones usados no app e recomendados no DS</h3>
+            </div>
+            <span class="rounded-full bg-brand-surface px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand-primary">Material Symbols</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">visibility</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">View</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">edit</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Edit</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700" style="font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 24;">delete</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Delete</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">share</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Export</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">save</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Save</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">calendar_month</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Calendar</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">person</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Clientes</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">logout</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Logout</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">picture_as_pdf</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Relatório</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">add_circle</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Create</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-warning-main">warning_amber</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Alert</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">camera_alt</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Capture</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">more_vert</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Menu</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">more_horiz</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">More</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">chevron_left</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Back</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">search</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Search</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">expand_more</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Expand</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-success-main">check_circle</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Compliant</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-error-main">cancel</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Non-compliant</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-500">remove_circle</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Não aplicável</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-500">visibility_off</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Hidden</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">tune</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Filter</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">person_search</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Auditor Filter</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700 icon-fill">near_me</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Send</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">content_copy</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Copy</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-700">info</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Info</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-error-main">block</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Block</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="ds-checkbox-on" aria-label="Checkbox On">✓</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Checkbox On</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-500">check_box_outline_blank</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Checkbox Off</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center transition hover:border-brand-primary/20 hover:bg-brand-surface">
+                <span class="material-symbols-outlined text-[24px] text-neutral-400">indeterminate_check_box</span>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Checkbox Disabled</p>
+              </div>
+            </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <div class="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p class="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Variante padronizada</p>
+              <h3 class="text-lg font-semibold text-neutral-900">Ícones com fundo tonal da Artezi</h3>
+            </div>
+            <span class="rounded-full bg-brand-surface px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand-primary">Square tonal</span>
+          </div>
+
+          <p class="mb-5 max-w-2xl text-sm leading-6 text-neutral-500">
+            Esta variação usa fundo quadrado com cantos arredondados, seguindo a linguagem de inputs, cards e ações do app.
+            O roxo permanece como cor principal do ícone, enquanto o fundo lavanda cria consistência com a identidade visual.
+          </p>
+
+          <div class="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">visibility</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">View</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">edit</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Edit</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 24;">delete</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Delete</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">share</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Export</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">save</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Save</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">calendar_month</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Calendar</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">person</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Clientes</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">logout</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Logout</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">picture_as_pdf</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Relatório</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">add_circle</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Create</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-warning-soft text-warning-main">
+                  <span class="material-symbols-outlined text-[24px]">warning_amber</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Alert</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">camera_alt</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Capture</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">more_vert</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Menu</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">more_horiz</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">More</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">chevron_left</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Back</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">search</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Search</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">expand_more</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Expand</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-success-soft text-success-main">
+                  <span class="material-symbols-outlined text-[24px]">check_circle</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Compliant</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-error-soft text-error-main">
+                  <span class="material-symbols-outlined text-[24px]">cancel</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Non-compliant</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">remove_circle</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Não aplicável</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">visibility_off</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Hidden</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">tune</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Filter</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">person_search</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Auditor Filter</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px] icon-fill">near_me</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Send</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">content_copy</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Copy</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[24px]">info</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Info</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-error-soft text-error-main">
+                  <span class="material-symbols-outlined text-[24px]">block</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Block</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-brand-soft text-brand-primary">
+                  <span class="ds-checkbox-on" aria-label="Checkbox On">✓</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Checkbox On</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#F3F5F9] text-[#7E8798]">
+                  <span class="material-symbols-outlined text-[24px]">check_box_outline_blank</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Checkbox Off</p>
+              </div>
+              <div class="rounded-2xl border border-neutral-200 p-4 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#F3F5F9] text-[#B8BFCB]">
+                  <span class="material-symbols-outlined text-[24px]">indeterminate_check_box</span>
+                </div>
+                <p class="mt-3 text-xs font-semibold text-neutral-600">Checkbox Disabled</p>
+              </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="componentes" class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Primeiros componentes</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Componentes iniciais refinados</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          Esta primeira leva foca no que hoje mais precisa de padronização no produto real: ações, campos,
+          status, cards e o bloco central de checklist.
+        </p>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-2">
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Buttons</p>
+          <div class="space-y-4">
+            <button class="w-full rounded-[20px] bg-brand-primary px-5 py-4 text-lg font-semibold text-white shadow-card">Primary Action</button>
+            <button class="w-full rounded-[20px] border border-brand-primary/30 bg-brand-surface px-5 py-4 text-lg font-semibold text-brand-primary">Secondary Action</button>
+            <button class="w-full rounded-[20px] bg-neutral-100 px-5 py-4 text-lg font-semibold text-neutral-400" disabled>Disabled Action</button>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Status Pills</p>
+          <div class="flex flex-wrap gap-3">
+            <span class="rounded-full bg-success-soft px-4 py-2 text-sm font-semibold text-success-main">Concluída</span>
+            <span class="rounded-full bg-warning-soft px-4 py-2 text-sm font-semibold text-warning-main">Pendente</span>
+            <span class="rounded-full bg-brand-soft px-4 py-2 text-sm font-semibold text-brand-primary">Em andamento</span>
+            <span class="rounded-full bg-error-soft px-4 py-2 text-sm font-semibold text-error-main">Não conforme</span>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Text Fields</p>
+          <div class="space-y-4">
+            <div class="rounded-[18px] border border-neutral-200 bg-neutral-25 px-5 py-4 text-neutral-500">Nome da empresa</div>
+            <div class="rounded-[18px] border-2 border-brand-primary bg-white px-5 py-4 text-neutral-900 shadow-soft">Villa Lobos</div>
+            <div class="rounded-[18px] border border-error-main/25 bg-error-soft px-5 py-4 text-error-main">Campo obrigatório</div>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Search Field</p>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3 rounded-[18px] border-2 border-brand-primary bg-white px-5 py-4 shadow-soft">
+              <span class="material-symbols-outlined text-neutral-400">search</span>
+              <span class="text-neutral-900">villa</span>
+            </div>
+            <div class="rounded-[18px] border border-neutral-200 bg-neutral-25 px-5 py-4">
+              <p class="font-semibold text-neutral-900">Villa Lobos</p>
+              <p class="mt-1 text-sm text-neutral-500">Resultado de busca</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Padrão do domínio</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Checklist item refinado</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          O checklist é o componente mais importante do produto. Esta primeira proposta melhora ritmo vertical,
+          clareza de resposta e hierarquia entre pergunta, ação e evidência.
+        </p>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div class="rounded-[28px] border border-neutral-200 bg-white p-6 shadow-soft">
+          <div class="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[0.2em] text-brand-primary">Execução de auditoria</p>
+              <h3 class="mt-1 text-2xl font-bold text-neutral-900">Checklist Item</h3>
+            </div>
+            <span class="rounded-full bg-brand-soft px-4 py-2 text-sm font-semibold text-brand-primary">13% concluído</span>
+          </div>
+
+          <div class="mb-6 h-3 overflow-hidden rounded-full bg-neutral-100">
+            <div class="h-full w-[13%] rounded-full bg-brand-primary"></div>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-neutral-25 p-5">
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <p class="max-w-xl text-[28px] leading-[1.35] tracking-[-0.02em] text-neutral-700 xl:text-[24px]">
+                Área externa do estabelecimento está livre de objetos em desuso, lixo, animais ou outros agentes contaminantes?
+              </p>
+
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[252px]">
+                <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-success-main/20 bg-success-soft text-success-main">
+                  <span class="material-symbols-outlined">check_circle</span>
+                </button>
+                <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                  <span class="material-symbols-outlined">cancel</span>
+                </button>
+                <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                  <span class="material-symbols-outlined">remove_circle</span>
+                </button>
+                <button class="flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-400">
+                  <span class="material-symbols-outlined">visibility_off</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-5 flex gap-3">
+              <div class="flex-1 rounded-[18px] border border-neutral-200 bg-white px-5 py-4 text-neutral-900">Tudo certo</div>
+              <button class="flex h-[58px] w-[58px] items-center justify-center rounded-[18px] border border-neutral-200 bg-white text-neutral-500">
+                <span class="material-symbols-outlined">photo_camera</span>
+              </button>
+            </div>
+
+            <div class="mt-5 flex items-center gap-4">
+              <div class="h-16 w-16 overflow-hidden rounded-2xl bg-brand-surface shadow-soft"></div>
+              <div>
+                <p class="font-semibold text-neutral-900">Evidência anexada</p>
+                <p class="text-sm text-neutral-500">1 foto vinculada a este item</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Resumo de seção</p>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h3 class="text-xl font-semibold text-neutral-900">Edificação e instalações</h3>
+                <p class="mt-2 text-sm text-neutral-500">32 de 32 itens preenchidos</p>
+              </div>
+              <div class="text-right">
+                <span class="rounded-full bg-success-soft px-4 py-2 text-sm font-semibold text-success-main">Concluída</span>
+                <p class="mt-3 text-3xl font-bold text-brand-primary">100%</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Modal de processamento</p>
+            <div class="rounded-[28px] border border-neutral-100 bg-brand-surface/55 p-6 text-center">
+              <div class="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-soft">
+                <div class="flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft text-brand-primary">
+                  <span class="material-symbols-outlined text-[30px]">progress_activity</span>
+                </div>
+              </div>
+              <h3 class="text-2xl font-bold text-brand-primary">Gerando relatório PDF</h3>
+              <p class="mt-3 text-base leading-7 text-neutral-500">
+                Estamos processando as respostas e montando o arquivo. Isso pode levar alguns segundos.
+              </p>
+            </div>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Sticky Bottom Action</p>
+            <div class="rounded-[28px] border border-neutral-100 bg-neutral-50 p-4">
+              <button class="w-full rounded-[20px] bg-brand-primary px-5 py-4 text-lg font-semibold text-white shadow-card">Salvar progresso</button>
+              <button class="mt-3 w-full rounded-[20px] bg-neutral-100 px-5 py-4 text-lg font-semibold text-neutral-400" disabled>Enviar para validação</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Padrão de revisão</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Resumo estratégico da auditoria</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          A versão final da tela de resumo consolidou novos padrões para revisão antes do relatório:
+          header de ações, resumo estratégico logo abaixo do topo, card de seção e perguntas em modo resumo.
+        </p>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div class="space-y-6">
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Review Header Actions</p>
+            <div class="space-y-4 rounded-[20px] bg-white px-1 py-2">
+              <div class="rounded-[18px] border border-neutral-100 bg-white px-4 py-3 shadow-soft">
+                <p class="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Estado fechado</p>
+                <div class="relative flex items-center justify-between">
+                  <button class="flex h-8 w-8 items-center justify-center rounded-full text-brand-primary">
+                    <span class="material-symbols-outlined text-[24px]">chevron_left</span>
+                  </button>
+                  <div class="pointer-events-none absolute left-1/2 flex -translate-x-1/2 justify-center">
+                    <img src="./logo-escura.png" alt="Artezi" class="h-6 w-auto object-contain" />
+                  </div>
+                  <button class="flex h-8 w-8 items-center justify-center rounded-full text-brand-primary">
+                    <span class="material-symbols-outlined text-[20px]">more_horiz</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="rounded-[18px] border border-neutral-100 bg-white px-4 py-3 shadow-soft">
+                <p class="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Estado aberto</p>
+                <div class="flex items-center justify-between">
+                  <button class="flex h-8 w-8 items-center justify-center rounded-full text-brand-primary">
+                    <span class="material-symbols-outlined text-[24px]">chevron_left</span>
+                  </button>
+                  <div class="flex items-center gap-2">
+                    <button class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft text-brand-primary shadow-soft">
+                      <span class="material-symbols-outlined text-[16px]">edit</span>
+                    </button>
+                    <button class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft text-brand-primary shadow-soft">
+                      <span class="material-symbols-outlined text-[16px]">share</span>
+                    </button>
+                    <button class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft text-brand-primary shadow-soft">
+                      <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                    </button>
+                    <button class="flex h-8 w-8 items-center justify-center rounded-full text-brand-primary">
+                      <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Header enxuto para tela de revisão. Em estado fechado, a logo fica centralizada e o gatilho usa more_horiz.
+              Ao abrir, a logo some e as ações aparecem em linha usando a linguagem tonal circular da marca.
+            </p>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Strategic Summary Header</p>
+            <div class="overflow-hidden bg-white px-1 py-1">
+              <div class="bg-white px-5 py-4 shadow-soft">
+                <div class="flex items-start justify-between gap-5">
+                  <div class="min-w-0">
+                    <h3 class="text-[24px] font-bold tracking-[-0.04em] text-brand-primary">Mouzi</h3>
+                    <p class="mt-2 text-sm font-medium text-neutral-500">ART-0042 • 03/03/2026</p>
+                    <p class="mt-2 text-sm font-medium text-neutral-500">29% concluído</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-[24px] font-bold tracking-[-0.04em] text-brand-primary">94,6%</p>
+                    <p class="mt-2 text-sm font-medium text-neutral-500">34 conformes</p>
+                    <p class="mt-1 text-sm font-medium text-neutral-500">3 não conformes</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Resumo estratégico usado logo abaixo do header, sem visual pesado e com hierarquia pensada para leitura rápida.
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Section Summary Card</p>
+            <div class="rounded-[20px] bg-white p-5 shadow-soft">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h3 class="text-[18px] font-semibold tracking-[-0.02em] text-neutral-900">Edificação e instalações</h3>
+                  <span class="mt-4 inline-flex rounded-full bg-success-soft px-3 py-1 text-sm font-semibold text-success-main">Concluída</span>
+                  <p class="mt-4 text-sm font-medium text-neutral-500">32 de 32 itens preenchidos</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-[18px] font-bold text-brand-primary">100,0%</p>
+                  <span class="material-symbols-outlined mt-4 text-[22px] text-neutral-500">expand_less</span>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Card de categoria sem borda, apoiado por sombra suave. Deve suportar título, status, percentual e ação de expandir.
+            </p>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Question Summary Row</p>
+            <div class="space-y-3">
+              <div class="rounded-[18px] bg-neutral-50 px-4 py-4">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex items-start gap-3">
+                    <span class="pt-[1px] text-sm font-semibold text-neutral-400">1.</span>
+                    <p class="text-[14px] leading-6 text-neutral-900">Área externa do estabelecimento está livre de objetos em desuso, lixo, animais ou outros agentes contaminantes?</p>
+                  </div>
+                  <div class="shrink-0 text-success-main">
+                    <span class="material-symbols-outlined text-[20px]">check_circle</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-[18px] bg-neutral-50 px-4 py-4">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex items-start gap-3">
+                    <span class="pt-[1px] text-sm font-semibold text-neutral-400">2.</span>
+                    <p class="text-[14px] leading-6 text-neutral-900">Pisos com revestimento liso, impermeável e lavável?</p>
+                  </div>
+                  <div class="shrink-0 text-[#7E8798]">
+                    <span class="material-symbols-outlined text-[20px]">remove_circle</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-[18px] bg-neutral-50 px-4 py-4">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex items-start gap-3">
+                    <span class="pt-[1px] text-sm font-semibold text-neutral-400">3.</span>
+                    <p class="text-[14px] leading-6 text-neutral-900">Portas com fechamento adequado e proteção contra entrada de vetores e pragas urbanas?</p>
+                  </div>
+                  <div class="shrink-0 text-neutral-400">
+                    <span class="material-symbols-outlined text-[20px]">help</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Linha resumida para perguntas em revisão, com numeração lateral e ícone de estado sem container.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="mb-16">
+      <div class="mb-8">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-brand-primary">Padrões operacionais</p>
+        <h2 class="text-3xl font-bold text-neutral-900">Planejamento, acompanhamento e agenda</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+          Padrões novos surgidos nas páginas concluídas do produto, voltados para rotina de operação,
+          filtros e leitura rápida em mobile.
+        </p>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-2">
+        <div class="space-y-6">
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Compact Status Filters</p>
+            <div class="rounded-[22px] bg-neutral-25 p-3 shadow-soft">
+              <div class="grid grid-cols-6 gap-2">
+                <button class="col-span-2 inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-2 text-center">
+                  <span class="text-[14px] font-bold tracking-[-0.03em] text-brand-primary">7</span>
+                  <span class="text-[11px] font-medium text-brand-primary">Total</span>
+                </button>
+                <button class="col-span-2 inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-full bg-white px-2.5 py-2 text-center shadow-soft">
+                  <span class="text-[14px] font-bold tracking-[-0.03em] text-success-main">2</span>
+                  <span class="text-[11px] font-medium text-neutral-600">Confirmadas</span>
+                </button>
+                <button class="col-span-2 inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-full bg-white px-2.5 py-2 text-center shadow-soft">
+                  <span class="text-[14px] font-bold tracking-[-0.03em] text-error-main">1</span>
+                  <span class="text-[11px] font-medium text-neutral-600">Recusadas</span>
+                </button>
+                <button class="col-span-3 inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-full bg-white px-2.5 py-2 text-center shadow-soft">
+                  <span class="text-[14px] font-bold tracking-[-0.03em] text-info-main">2</span>
+                  <span class="text-[11px] font-medium text-neutral-600">Em andamento</span>
+                </button>
+                <button class="col-span-3 inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-full bg-white px-2.5 py-2 text-center shadow-soft">
+                  <span class="text-[14px] font-bold tracking-[-0.03em] text-warning-main">2</span>
+                  <span class="text-[11px] font-medium text-neutral-600">Não agendadas</span>
+                </button>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Filtros compactos e clicáveis para acompanhamento do mês, seguindo a ordem final de prioridade da operação:
+              total, confirmadas, recusadas, em andamento e não agendadas.
+            </p>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Operational Status Tags</p>
+            <div class="rounded-[22px] bg-neutral-25 p-5 shadow-soft">
+              <div class="flex flex-wrap gap-2">
+                <span class="inline-flex rounded-full bg-info-soft px-2.5 py-1 text-[11px] font-semibold tracking-[-0.01em] text-info-main">Validar com cliente</span>
+                <span class="inline-flex rounded-full bg-warning-soft px-2.5 py-1 text-[11px] font-semibold tracking-[-0.01em] text-warning-main">Pendente sugestão de data</span>
+                <span class="inline-flex rounded-full bg-[#F9E8EF] px-2.5 py-1 text-[11px] font-semibold tracking-[-0.01em] text-[#B45479]">Pendente envio de nova proposta de data</span>
+                <span class="inline-flex rounded-full bg-error-soft px-2.5 py-1 text-[11px] font-semibold tracking-[-0.01em] text-error-main">Recusada pelo auditor</span>
+                <span class="inline-flex rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold tracking-[-0.01em] text-success-main">Confirmada</span>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Tags oficiais dos fluxos operacionais da Clau e das auditoras. Em telas filtradas por status, evitar repetir a tag quando ela estiver implícita no contexto.
+            </p>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Auditor Multi-Select Filter</p>
+            <div class="rounded-[22px] bg-white p-5 shadow-soft">
+              <div class="flex items-center gap-2 text-[13px] font-medium text-neutral-600">
+                <span class="ds-checkbox-on">✓</span>
+                <span>Selecionar todos os auditores</span>
+              </div>
+              <div class="mt-4 space-y-2">
+                <div class="flex items-center justify-between rounded-[16px] bg-neutral-25 px-4 py-3 text-[13px] font-medium text-neutral-600">
+                  <span>Claudia</span>
+                  <span class="ds-checkbox-on">✓</span>
+                </div>
+                <div class="flex items-center justify-between rounded-[16px] bg-neutral-25 px-4 py-3 text-[13px] font-medium text-neutral-600">
+                  <span>Fernanda</span>
+                  <span class="ds-checkbox-off"></span>
+                </div>
+                <div class="flex items-center justify-between rounded-[16px] bg-neutral-25 px-4 py-3 text-[13px] font-medium text-neutral-600">
+                  <span>Giulia</span>
+                  <span class="ds-checkbox-on">✓</span>
+                </div>
+                <div class="flex items-center justify-between rounded-[16px] bg-neutral-25 px-4 py-3 text-[13px] font-medium text-neutral-600">
+                  <span>Marcela</span>
+                  <span class="ds-checkbox-on">✓</span>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Filtro de auditor com seleção múltipla, inclusive ação de selecionar todos, pensado para listas e agendas de auditorias confirmadas.
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Period Filter Calendar</p>
+            <div class="rounded-[24px] bg-white p-5 shadow-soft">
+              <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-[18px] bg-brand-soft px-4 py-3">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">Data inicial</p>
+                  <p class="mt-2 text-[13px] font-medium text-neutral-600">25 mar 26</p>
+                </div>
+                <div class="rounded-[18px] bg-brand-soft px-4 py-3">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">Data final</p>
+                  <p class="mt-2 text-[13px] font-medium text-neutral-600">05 abr 26</p>
+                </div>
+              </div>
+              <div class="mt-4 rounded-[22px] bg-neutral-50 p-4">
+                <div class="flex items-center gap-2">
+                  <div class="inline-flex min-h-[30px] items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-neutral-700 shadow-soft">
+                    <span>Abril</span>
+                    <span class="material-symbols-outlined text-[14px] text-neutral-400">expand_more</span>
+                  </div>
+                  <div class="inline-flex min-h-[30px] items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-neutral-700 shadow-soft">
+                    <span>2026</span>
+                    <span class="material-symbols-outlined text-[14px] text-neutral-400">expand_more</span>
+                  </div>
+                </div>
+                <div class="mt-4 grid grid-cols-7 gap-2 text-center text-[12px]">
+                  <span class="text-neutral-400">D</span>
+                  <span class="text-neutral-400">S</span>
+                  <span class="text-neutral-400">T</span>
+                  <span class="text-neutral-400">Q</span>
+                  <span class="text-neutral-400">Q</span>
+                  <span class="text-neutral-400">S</span>
+                  <span class="text-neutral-400">S</span>
+                  <span></span><span></span>
+                  <span class="text-neutral-500">1</span>
+                  <span class="text-neutral-500">2</span>
+                  <span class="text-neutral-500">3</span>
+                  <span class="text-neutral-500">4</span>
+                  <span class="text-neutral-500">5</span>
+                  <span class="text-neutral-500">6</span>
+                  <span class="text-neutral-500">7</span>
+                  <span class="text-neutral-500">8</span>
+                  <span class="text-neutral-500">9</span>
+                  <span class="text-neutral-500">10</span>
+                  <span class="text-neutral-500">11</span>
+                  <span class="text-neutral-500">12</span>
+                  <span class="text-neutral-500">13</span>
+                  <span class="text-neutral-500">14</span>
+                  <span class="text-neutral-500">15</span>
+                  <span class="text-neutral-500">16</span>
+                  <span class="text-neutral-500">17</span>
+                  <span class="text-neutral-500">18</span>
+                  <span class="text-neutral-500">19</span>
+                  <span class="text-neutral-500">20</span>
+                  <span class="text-neutral-500">21</span>
+                  <span class="text-neutral-500">22</span>
+                  <span class="text-neutral-500">23</span>
+                  <span class="text-neutral-500">24</span>
+                  <span class="rounded-full bg-brand-primary py-1 font-semibold text-white">25</span>
+                  <span class="rounded-full bg-brand-soft py-1 text-brand-primary">26</span>
+                  <span class="rounded-full bg-brand-soft py-1 text-brand-primary">27</span>
+                  <span class="rounded-full bg-brand-soft py-1 text-brand-primary">28</span>
+                  <span class="rounded-full bg-brand-soft py-1 text-brand-primary">29</span>
+                  <span class="rounded-full bg-brand-soft py-1 text-brand-primary">30</span>
+                  <span class="rounded-full bg-brand-primary py-1 font-semibold text-white">31</span>
+                </div>
+              </div>
+              <p class="mt-3 text-[12px] font-medium text-error-main">O período selecionado pode ter no máximo 31 dias.</p>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Calendário de período com seleção real de data inicial e final, suporte a cruzar meses, troca de mês/ano e bloqueio explícito apenas no aplicar quando o período ultrapassa 31 dias.
+            </p>
+          </div>
+
+          <div class="rounded-[24px] border border-neutral-200 bg-white p-6 shadow-soft">
+            <p class="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-neutral-400">Confirmed Agenda List</p>
+            <div class="space-y-4 rounded-[22px] bg-neutral-25 p-5">
+              <div>
+                <p class="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-400">Segunda, 23 mar</p>
+                <div class="mt-2 rounded-[20px] bg-white p-4 shadow-soft">
+                  <h3 class="text-[17px] font-semibold tracking-[-0.03em] text-brand-dark">Padaria Lisboa</h3>
+                  <p class="mt-2 text-sm text-neutral-500">Auditor: Claudia</p>
+                  <p class="mt-2 text-sm leading-5 text-neutral-500">Rua das Flores, 82 • São Paulo, SP</p>
+                </div>
+              </div>
+              <div>
+                <p class="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-400">Sexta, 27 mar</p>
+                <div class="mt-2 rounded-[20px] bg-white p-4 shadow-soft">
+                  <h3 class="text-[17px] font-semibold tracking-[-0.03em] text-brand-dark">Villa Lobos</h3>
+                  <p class="mt-2 text-sm text-neutral-500">Auditor: Marcela</p>
+                  <p class="mt-2 text-sm leading-5 text-neutral-500">Rua das Palmeiras, 140 • São Paulo, SP</p>
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-6 text-neutral-500">
+              Lista agrupada por dia para agenda de auditorias confirmadas. Como o status já é implícito, o card mostra apenas cliente, auditor e endereço.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-neutral-200 bg-white">
+    <div class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-neutral-500 md:flex-row md:items-center md:justify-between md:px-6">
+      <p class="font-medium text-neutral-700">Artezi Design System V3</p>
+      <p>Versão final consolidada com foundations, fluxos operacionais e padrões validados nas telas concluídas.</p>
+    </div>
+  </footer>
+</body>
+</html>
+
+
