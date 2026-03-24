@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -42,22 +42,33 @@
     }
 
     :root {
-      --brand: #39306e;
-      --purple: #7262c2;
-      --text: #1c1c1c;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --bg: #f6f5f5;
-      --good: #16a34a;
-      --bad: #dc2626;
-      --na: #6b7280;
-      --not-observed: #d4a106;
-      --paper: #ffffff;
+      --brand: #7357d8;
+      --brand-dark: #1b1830;
+      --brand-soft: #eee9ff;
+      --text: #1f2430;
+      --muted: #6f7588;
+      --line: #e6e8f0;
+      --surface: #ffffff;
+      --surface-soft: #f7f8fc;
+      --success: #6bc792;
+      --success-soft: #e8f7ef;
+      --warning: #e3b15e;
+      --warning-soft: #fff3df;
+      --error: #ef8d8d;
+      --error-soft: #fdecec;
+      --neutral-soft: #eef2f8;
+      --neutral-text: #67728a;
+      --shadow: 0 20px 56px rgba(23, 26, 36, 0.08);
     }
 
     @page {
-      size: A4;
-      margin: 24px 28px 24px 28px;
+      size: A4 portrait;
+      margin: 8mm 8mm 8mm;
+    }
+
+    @page:first {
+      size: A4 portrait;
+      margin: 0 8mm 8mm;
     }
 
     * {
@@ -68,240 +79,345 @@
 
     html,
     body {
-      color: var(--text);
       font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      background: #ffffff;
+      color: var(--text);
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      line-height: 1.45;
+    }
+
+    body {
+      padding: 0;
       font-size: 12px;
-      background: var(--paper);
+      line-height: 1.5;
     }
 
     .page {
       width: 100%;
-      background: var(--paper);
-      padding-top: 8px;
-      padding-bottom: 48px;
+      margin: 0;
+      background: var(--surface);
+      border: none;
+      box-shadow: none;
+      overflow: hidden;
     }
 
-    .page-footer-global {
-      position: fixed;
-      left: 28px;
-      right: 28px;
-      bottom: 0;
-      text-align: center;
-      font-size: 10px;
-      color: #bfbfbf;
-      background: transparent;
-      padding: 4px 0 2px;
+    .content {
+      padding: 0 26px 28px;
     }
 
-    .brand-header {
+    .topbar {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: flex-end;
-      padding: 20px 20px 16px;
-      background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.08) 100%),
-        #1e212f;
-      color: #ffffff;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    .brand-header img {
-      width: 132px;
-      height: auto;
-      object-fit: contain;
-      display: block;
-    }
-
-    .brand-title {
-      font-size: 10px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      font-weight: 600;
-      opacity: 0.92;
-      text-align: right;
-    }
-
-    .container {
-      width: 100%;
-      border: 1px solid var(--line);
-      padding: 20px;
-      background: var(--paper);
-      box-sizing: border-box;
-      position: relative;
-      overflow: visible;
-      -webkit-box-decoration-break: clone;
-      box-decoration-break: clone;
-    }
-
-    .container::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      height: 1px;
-      background: var(--line);
-      pointer-events: none;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 36px;
-      padding-bottom: 18px;
-      margin-bottom: 18px;
+      gap: 24px;
+      padding: 4px 26px 16px;
+      margin: 0 -26px;
+      background: #ffffff;
       border-bottom: 1px solid var(--line);
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
-    .header-info {
-      flex: 1;
+    .brand-lockup,
+    .artezi-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
       min-width: 0;
     }
 
-    .header-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--brand);
-      letter-spacing: 0.2px;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
-
-    .header-info h1 {
-      font-family: 'Inter', sans-serif;
-      font-weight: 800;
-      font-style: normal;
-      font-kerning: normal;
-      font-feature-settings: "kern" 1, "liga" 1;
-      text-rendering: geometricPrecision;
-    }
-
-    .header-info p {
-      margin-top: 6px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .header-info strong {
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    .header-logo {
-      width: 168px;
-      flex-shrink: 0;
-    }
-
-    .header-logo img {
-      width: 100%;
+    .artezi-logo-top {
+      width: 94px;
       height: auto;
-      display: block;
       object-fit: contain;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px;
-      background: #fff;
+      display: block;
     }
 
-    .score-box {
-      margin: 4px 0 18px;
+    .artezi-caption {
+      font-size: 11px;
+      line-height: 1.45;
+      color: #8f96a8;
+    }
+
+    .top-copy {
+      text-align: right;
+      position: relative;
+      padding-left: 14px;
+    }
+
+    .top-copy::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 2px;
+      bottom: 2px;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+    }
+
+    .title {
+      font-size: 14px;
+      line-height: 1.04;
+      letter-spacing: 0.14em;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #7c84a0;
+    }
+
+    .hero {
+      padding: 24px 0 18px;
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
-    .score {
-      color: var(--purple);
-      font-size: 42px;
-      font-weight: 800;
-      line-height: 1;
+    .hero-card {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: #ffffff;
+      padding: 26px 28px 18px;
+      position: relative;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
-    .classificacao {
-      margin-top: 6px;
-      font-size: 14px;
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      left: 26px;
+      right: 26px;
+      top: 0;
+      height: 5px;
+      border-radius: 0 0 999px 999px;
+      background: var(--brand);
+    }
+
+    .section-kicker,
+    .info-label,
+    .meta-label,
+    .table-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #9aa1b4;
+    }
+
+    .section-kicker {
+      margin-bottom: 8px;
+    }
+
+    .client-name {
+      font-size: 26px;
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      font-weight: 700;
+      color: var(--brand-dark);
+    }
+
+    .hero-subtitle {
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .hero-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .hero-body {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px 18px;
+    }
+
+    .info-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .info-label {
+      margin-bottom: 4px;
+    }
+
+    .info-value {
+      font-size: 15px;
+      line-height: 1.45;
+      color: var(--brand-dark);
+    }
+
+    .score-panel {
+      margin-top: -104px;
+      width: 100%;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .score-box {
+      position: relative;
+      width: max-content;
+      margin-left: auto;
+      padding: 8px 0 8px 20px;
+    }
+
+    .score-box::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 4px;
+      bottom: 4px;
+      width: 4px;
+      border-radius: 999px;
+      background: #d9d1ff;
+    }
+
+    .score-value {
+      font-size: 48px;
+      line-height: 1;
+      letter-spacing: -0.05em;
       font-weight: 700;
       color: var(--brand);
     }
 
+    .score-caption {
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #656e8d;
+    }
+
     .section {
-      margin-top: 24px;
+      margin-top: 38px;
       page-break-inside: auto;
       break-inside: auto;
     }
 
-    .section.keep-whole {
-      page-break-inside: avoid;
-      break-inside: avoid-page;
-      page-break-before: auto;
-      break-before: auto;
-    }
-
-    .section h2 {
-      font-size: 16px;
-      color: var(--brand);
-      font-weight: 700;
-      border-bottom: 2px solid var(--line);
-      padding-bottom: 6px;
-      margin-bottom: 12px;
+    .section-head {
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
       page-break-after: avoid;
       break-after: avoid;
     }
 
+    .section-subtitle {
+      position: relative;
+      padding-left: 14px;
+      font-size: 15px;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      font-weight: 700;
+      color: #1f2440;
+    }
+
+    .section-subtitle::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 2px;
+      bottom: 2px;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+    }
+
+    .text,
+    .conclusion,
+    .meta-value,
+    tbody td {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--muted);
+    }
+
     .summary-list {
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--text);
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
     }
 
-    .summary-list strong {
-      font-weight: 600;
-    }
-
-    .category-bars {
+    .summary-item {
       display: flex;
-      flex-direction: column;
       gap: 10px;
-      page-break-inside: avoid;
-      break-inside: avoid-page;
-    }
-
-    .category-bar-row {
+      align-items: flex-start;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--muted);
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
-    .category-bar-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      font-size: 12px;
-      margin-bottom: 4px;
+    .summary-item::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      flex-shrink: 0;
+      border-radius: 999px;
+      background: var(--brand);
+      margin-top: 9px;
     }
 
-    .category-name {
-      color: var(--text);
-      font-weight: 600;
+    .performance-wrap {
+      display: grid;
+      gap: 22px;
     }
 
-    .category-value {
-      color: var(--brand);
+    .performance-block {
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
+    .chart-title {
+      font-size: 13px;
       font-weight: 700;
+      color: #656e8d;
+      margin: 6px 0 14px;
+    }
+
+    .bars {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      gap: 8px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .bar-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .bar-label {
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--muted);
     }
 
     .bar-track {
-      width: 100%;
-      height: 10px;
-      background: {{CATEGORY_BAR_TRACK_COLOR}};
+      height: 12px;
       border-radius: 999px;
+      background: {{CATEGORY_BAR_TRACK_COLOR}};
       overflow: hidden;
-      border: 1px solid #e2e2ee;
+      position: relative;
     }
 
     .bar-fill {
@@ -309,277 +425,425 @@
       border-radius: 999px;
     }
 
-    .bar-fill.bar-good { background: var(--good); }
-    .bar-fill.bar-bad { background: var(--bad); }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      font-size: 12px;
+    .bar-fill.bar-good {
+      background: var(--success);
     }
 
-    thead {
-      display: table-header-group;
+    .bar-fill.bar-bad {
+      background: var(--error);
     }
 
-    tr {
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      vertical-align: top;
-      padding: 10px 6px;
-      line-height: 1.35;
-      word-break: break-word;
-    }
-
-    th {
-      background: var(--bg);
-      color: var(--brand);
+    .bar-value {
+      font-size: 13px;
       font-weight: 700;
+      color: #5f667a;
+      text-align: right;
+      flex-shrink: 0;
     }
 
-    .status-good { color: var(--good); font-weight: 600; }
-    .status-bad { color: var(--bad); font-weight: 600; }
-    .status-na { color: var(--na); font-weight: 600; }
-    .status-not-observed { color: var(--not-observed); font-weight: 600; }
-    .status-muted { color: var(--muted); font-weight: 600; }
-
-    .checklist-table col.question-col {
-      width: 9%;
-    }
-
-    .checklist-table col.category-col {
-      width: 24%;
-    }
-
-    .checklist-table col.description-col {
-      width: 51%;
-    }
-
-    .checklist-table col.status-col {
-      width: 16%;
-    }
-
-    .checklist-table tr {
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    .checklist-comment {
-      margin-top: 6px;
-      font-size: 11px;
-      line-height: 1.45;
-      color: var(--muted);
-      word-break: break-word;
-    }
-
-    .checklist-comment-label {
-      color: var(--brand);
-      font-weight: 600;
+    .nonconform-list {
+      display: grid;
+      gap: 12px;
     }
 
     .nonconform {
       border: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 12px;
+      border-radius: 22px;
+      background: var(--surface);
+      padding: 16px 16px 14px;
       page-break-inside: avoid;
-      break-inside: avoid;
-      display: block;
-      box-sizing: border-box;
+      break-inside: avoid-page;
     }
 
-    .nonconform h3 {
-      color: var(--brand);
-      font-size: 13px;
+    .nonconform-header {
+      font-size: 15px;
+      line-height: 1.45;
       font-weight: 700;
+      color: var(--brand);
+    }
+
+    .nonconform-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+      margin-top: 10px;
+    }
+
+    .nonconform-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .meta-label {
       margin-bottom: 4px;
-    }
-
-    .label {
-      margin-top: 4px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .value {
-      margin-top: 2px;
-      font-size: 12px;
-      color: var(--muted);
+      color: #656e8d;
     }
 
     .photos {
-      margin-top: 8px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 6px;
     }
 
-    .photo-item {
-      width: 220px;
-      min-height: 0;
-      border: none;
-      border-radius: 0;
-      padding: 0;
-      background: transparent;
+    .photo-item,
+    .photo-empty,
+    .empty-box {
+      min-height: 110px;
+      border: 1px solid #d7dae7;
+      border-radius: 16px;
+      background: var(--surface-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #8d93a7;
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
     .photo-item img {
       width: 100%;
-      max-height: 180px;
-      display: block;
+      max-height: 170px;
       object-fit: contain;
-      border-radius: 6px;
+      display: block;
+      border-radius: 12px;
     }
 
-    .photo-empty,
     .empty-box {
-      border: 1px dashed var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      color: var(--muted);
-      font-size: 11px;
-      text-align: center;
-      background: #fff;
+      min-height: 0;
+      padding: 18px;
+      justify-content: flex-start;
+      text-align: left;
     }
 
-    .photo-empty { width: 220px; }
-
-    .conclusion {
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      border-radius: 18px;
+      overflow: hidden;
       font-size: 13px;
-      color: var(--text);
-      line-height: 1.7;
     }
 
-    .normative {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 12px;
+    thead {
+      display: table-header-group;
     }
 
-    .institutional-footer {
-      margin-top: 24px;
-      padding-top: 14px;
+    thead th {
+      padding: 12px 14px;
+      background: var(--surface-soft);
       border-top: 1px solid var(--line);
-      text-align: center;
-      font-size: 10px;
-      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8f96a8;
+    }
+
+    tbody tr {
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
-    .institutional-footer img {
-      width: 130px;
-      margin-bottom: 8px;
-      object-fit: contain;
+    tbody td {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
     }
 
-    .institutional-footer strong {
-      color: var(--text);
+    tbody td.col-order {
+      width: 8%;
+      white-space: nowrap;
     }
 
-    .conclusion-block {
+    tbody td.col-category { width: 20%; }
+    tbody td.col-status { width: 16%; white-space: nowrap; }
+
+    .question {
+      color: var(--brand-dark);
+      font-weight: 600;
+      line-height: 1.6;
+    }
+
+    .responsible,
+    .comment {
+      display: block;
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .responsible strong {
+      color: inherit;
+      font-weight: 600;
+    }
+
+    .comment strong {
+      color: var(--brand);
+      font-weight: 600;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .status-badge.status-good {
+      background: var(--success-soft);
+      color: #2e8b57;
+    }
+
+    .status-badge.status-bad {
+      background: var(--error-soft);
+      color: #d84c5f;
+    }
+
+    .status-badge.status-na {
+      background: var(--neutral-soft);
+      color: var(--neutral-text);
+    }
+
+    .status-badge.status-not-observed {
+      background: #fff4e8;
+      color: #c87a2a;
+    }
+
+    .status-badge.status-muted,
+    .status-badge.status-regular {
+      background: var(--neutral-soft);
+      color: var(--neutral-text);
+    }
+
+    .conclusion strong {
+      color: var(--brand-dark);
+    }
+
+    .footer {
+      margin-top: 38px;
+      padding-top: 28px;
+      border-top: 1px solid var(--line);
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .report-end {
       page-break-inside: avoid;
       break-inside: avoid-page;
     }
 
-    .conclusion-block .section,
-    .conclusion-block .section h2,
-    .conclusion-block .conclusion,
-    .conclusion-block .normative,
-    .conclusion-block .institutional-footer {
+    .report-end .section {
+      margin-top: 38px;
+    }
+
+    .report-end .footer {
+      margin-top: 24px;
+    }
+
+    .report-end-marker {
+      margin-top: 22px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
       page-break-inside: avoid;
       break-inside: avoid;
+    }
+
+    .report-end-marker::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      background: var(--brand);
+      transform: rotate(45deg);
+      border-radius: 1px;
+    }
+
+    .footer-brands {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      margin-bottom: 16px;
+    }
+
+    .footer-brand-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .footer-separator {
+      width: 1px;
+      height: 86px;
+      flex-shrink: 0;
+      background: var(--line);
+    }
+
+    .footer-brand-artezi {
+      width: 124px;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .footer-brand-atac {
+      width: 122px;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .footer-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--brand-dark);
+    }
+
+    .footer-meta {
+      margin-top: 4px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    .footer-legal {
+      margin-top: 20px;
+      font-size: 11px;
+      line-height: 1.8;
+      color: #8d93a7;
     }
   </style>
 </head>
 <body>
-  <div class="page-footer-global">Artezi Consultoria em Segurança Alimentar</div>
-  <div class="page">
-    <div class="brand-header">
-      <img src="{{ARTEZI_LOGO_DATA_URI}}" alt="Logo Artezi" />
-      <div class="brand-title">Relatório Técnico de Auditoria Sanitária</div>
-    </div>
-
-    <div class="container">
-      <header class="header">
-        <div class="header-info">
-          <h1 class="header-title">Relatório de Auditoria Sanitária</h1>
-          <p><strong>Cliente:</strong> {{CLIENT_NAME}}</p>
-          <p><strong>Data da auditoria:</strong> {{AUDIT_DATE}}</p>
-          <p><strong>Endereço completo:</strong> {{AUDIT_ADDRESS}}</p>
-          <p><strong>Operadora:</strong> {{OPERATOR_NAME}}</p>
-          <p><strong>Auditora:</strong> {{AUDITOR_NAME}}</p>
-          <p><strong>Inauguração:</strong> {{OPENING_DATE}}</p>
-          <p><strong>Código de Auditoria:</strong> {{AUDIT_CODE}}</p>
+  <main class="page">
+    <div class="content">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="artezi-brand">
+            <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Artezi" class="artezi-logo-top" />
+            <div class="artezi-caption">Auditoria realizada por Artezi</div>
+          </div>
         </div>
-        <div class="header-logo">
-          <img src="{{CLIENT_LOGO_DATA_URI}}" alt="Logo Cliente" />
+        <div class="top-copy">
+          <div class="title">Relatório técnico de auditoria sanitária</div>
         </div>
       </header>
 
-      <section class="score-box">
-        <div class="score">{{OVERALL_SCORE}}%</div>
-        <div class="classificacao">Classificação: {{OVERALL_CLASSIFICATION}}</div>
+      <section class="hero">
+        <div class="hero-card">
+          <div class="hero-header-row">
+            <div class="hero-title-block">
+              <div class="section-kicker">Resumo da auditoria</div>
+              <div class="client-name">{{CLIENT_NAME}}</div>
+              <div class="hero-subtitle">Auditoria sanitária realizada em {{AUDIT_DATE}}</div>
+            </div>
+          </div>
+
+          <div class="hero-body">
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-label">Código da auditoria</div>
+                <div class="info-value">{{AUDIT_CODE}}</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-label">Operadora</div>
+                <div class="info-value">{{OPERATOR_NAME}}</div>
+              </div>
+
+              <div class="info-item">
+                <div class="info-label">Auditor responsável</div>
+                <div class="info-value">{{AUDITOR_NAME}}</div>
+              </div>
+
+              <div class="info-item full">
+                <div class="info-label">Endereço completo</div>
+                <div class="info-value">{{AUDIT_ADDRESS}}</div>
+              </div>
+            </div>
+
+            <aside class="score-panel">
+              <div class="score-box">
+                <div class="score-value">{{OVERALL_SCORE}}%</div>
+                <div class="score-caption">Classificação geral: {{OVERALL_CLASSIFICATION}}</div>
+              </div>
+            </aside>
+          </div>
+        </div>
       </section>
 
       <section class="section">
-        <h2>1. Visão Geral</h2>
-        <div class="summary-list">
+        <div class="section-head">
+          <div class="section-subtitle">1. Visão geral</div>
+        </div>
+
+        <div class="text">
           A auditoria foi realizada com base nos critérios estabelecidos pela RDC 216 e normas internas aplicáveis.
-          <br /><br />
-          <strong>Resumo:</strong><br />
-          • Nota Geral: {{OVERALL_SCORE}}%<br />
-          • Total de Itens Avaliados: {{TOTAL_EVALUATED_ITEMS}}<br />
-          • Não Conformidades Identificadas: {{NON_COMPLIANT_COUNT}}<br />
-          • Data de emissão: {{ISSUED_AT}}
         </div>
-      </section>
 
-      <section class="section keep-whole">
-        <h2>2. Desempenho por Responsável</h2>
-        <div class="category-bars">
-          {{RESPONSIBLE_BARS}}
-        </div>
-      </section>
-
-      <section class="section keep-whole">
-        <h2>3. Desempenho por Categoria</h2>
-        <div class="category-bars">
-          {{CATEGORY_BARS}}
+        <div class="summary-list">
+          <div class="summary-item">Nota Geral: {{OVERALL_SCORE}}%</div>
+          <div class="summary-item">Total de Itens Avaliados: {{TOTAL_EVALUATED_ITEMS}}</div>
+          <div class="summary-item">Não Conformidades Identificadas: {{NON_COMPLIANT_COUNT}}</div>
         </div>
       </section>
 
       <section class="section">
-        <h2>4. Não Conformidades Identificadas</h2>
-        {{NON_COMPLIANCE_ROWS}}
+        <div class="section-head">
+          <div class="section-subtitle">2. Desempenho da auditoria</div>
+        </div>
+
+        <div class="performance-wrap">
+          <div class="performance-block">
+            <div class="chart-title">Por responsável</div>
+            <div class="bars">{{RESPONSIBLE_BARS}}</div>
+          </div>
+
+          <div class="performance-block">
+            <div class="chart-title">Por categoria</div>
+            <div class="bars">{{CATEGORY_BARS}}</div>
+          </div>
+        </div>
       </section>
 
       <section class="section">
-        <h2>5. Checklist Consolidado</h2>
-        <table class="checklist-table">
-          <colgroup>
-            <col class="question-col" />
-            <col class="category-col" />
-            <col class="description-col" />
-            <col class="status-col" />
-          </colgroup>
+        <div class="section-head">
+          <div class="section-subtitle">3. Não conformidades identificadas</div>
+        </div>
+
+        <div class="nonconform-list">{{NON_COMPLIANCE_ROWS}}</div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-subtitle">4. Checklist consolidado</div>
+        </div>
+
+        <table>
           <thead>
             <tr>
-              <th>Questão</th>
-              <th>Categoria</th>
-              <th>Descrição</th>
-              <th>Status</th>
+              <th style="width: 70px;">Nº</th>
+              <th style="width: 170px;">Categoria</th>
+              <th>Descrição da pergunta + comentário</th>
+              <th style="width: 120px;">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -588,37 +852,40 @@
         </table>
       </section>
 
-      <div class="conclusion-block">
-        <section class="section keep-whole">
-          <h2>6. Conclusão Técnica</h2>
-          <p class="conclusion">
-            Com base na avaliação realizada, a unidade apresentou classificação
-            <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas
-            prioritárias nos itens identificados como não conformes.
+      <div class="report-end">
+        <section class="section">
+          <div class="section-head">
+            <div class="section-subtitle">5. Conclusão técnica</div>
+          </div>
+
+          <div class="conclusion">
+            Com base na avaliação realizada, a unidade apresentou classificação <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas prioritárias nos itens identificados como não conformes.
             <br /><br />
             Recomenda-se acompanhamento técnico e reavaliação no próximo ciclo de auditoria.
-          </p>
-          <p class="normative">
-            <strong>Referência normativa:</strong> Resolução RDC nº 216, de 15 de setembro de 2004 - ANVISA -
-            Regulamento Técnico de Boas Práticas para Serviços de Alimentação.
-          </p>
+            <br /><br />
+            <strong>Referência normativa:</strong> Resolução RDC nº 216, de 15 de setembro de 2004 - ANVISA - Regulamento Técnico de Boas Práticas para Serviços de Alimentação.
+          </div>
         </section>
 
-        <div class="institutional-footer">
-          <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Logo Institucional" />
-          <p><strong>Claudia Artezi</strong></p>
-          <p>Responsável Técnica</p>
-          <p>São Paulo - SP</p>
-          <br />
-          <p>Os direitos autorais deste documento pertencem às empresas Artezi e ATAC. Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente, sem autorização prévia e expressa. Todos os direitos e marcas são devidamente reconhecidos.</p>
-        </div>
+        <footer class="footer">
+          <div class="footer-brands">
+            <img src="{{CLIENT_LOGO_DATA_URI}}" alt="Cliente" class="footer-brand-atac" />
+            <div class="footer-separator"></div>
+            <div class="footer-brand-block">
+              <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Artezi" class="footer-brand-artezi" />
+              <div class="footer-name">Claudia Artezi</div>
+              <div class="footer-meta">Responsável Técnica</div>
+              <div class="footer-meta">São Paulo - SP</div>
+            </div>
+          </div>
+          <div class="footer-legal">
+            Os direitos autorais deste documento pertencem às empresas ATAC e Artezi. Este documento não poderá ser reproduzido ou divulgado, total ou parcialmente, sem autorização prévia e expressa. Todos os direitos e marcas são devidamente reconhecidos.
+          </div>
+        </footer>
+
+        <div class="report-end-marker"></div>
       </div>
     </div>
-  </div>
+  </main>
 </body>
 </html>
-
-
-
-
-

@@ -10,8 +10,9 @@ import '../audits/services/audit_creation_service.dart';
 import '../auth/login_page.dart';
 import '../clients/clients_page.dart';
 import '../planning/models/monthly_plan_item.dart';
-import '../planning/planning_entry_page.dart';
+import '../planning/confirmed_agenda_page.dart';
 import '../planning/planning_management_page.dart';
+import '../planning/monthly_planning_page.dart';
 import '../planning/services/monthly_planning_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -634,22 +635,18 @@ class _HomePageState extends State<HomePage> {
               top: 0,
               bottom: 0,
               right: _isMenuOpen ? 0 : -306,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10, bottom: 10),
-                  child: _HomeSideMenu(
-                    isSigningOut: _isSigningOut,
-                    onClose: _closeMenu,
-                    onTapGestao: () => _openPage(const PlanningManagementPage()),
-                    onTapClientes: () => _openPage(const ClientsPage()),
-                    onTapAuditorias: () => _openPage(const AuditsPage()),
-                    onTapAgenda: () => _openPage(const PlanningEntryPage()),
-                    onTapLogout: () async {
-                      _closeMenu();
-                      await _handleLogout();
-                    },
-                  ),
-                ),
+              child: _HomeSideMenu(
+                isSigningOut: _isSigningOut,
+                onClose: _closeMenu,
+                onTapGestao: () => _openPage(const PlanningManagementPage()),
+                onTapPlanejamentoMensal: () => _openPage(const MonthlyPlanningPage()),
+                onTapClientes: () => _openPage(const ClientsPage()),
+                onTapAuditorias: () => _openPage(const AuditsPage()),
+                onTapAgenda: () => _openPage(const ConfirmedAgendaPage()),
+                onTapLogout: () async {
+                  _closeMenu();
+                  await _handleLogout();
+                },
               ),
             ),
           ],
@@ -1020,6 +1017,7 @@ class _HomeSideMenu extends StatelessWidget {
     required this.isSigningOut,
     required this.onClose,
     required this.onTapGestao,
+    required this.onTapPlanejamentoMensal,
     required this.onTapClientes,
     required this.onTapAuditorias,
     required this.onTapAgenda,
@@ -1029,6 +1027,7 @@ class _HomeSideMenu extends StatelessWidget {
   final bool isSigningOut;
   final VoidCallback onClose;
   final VoidCallback onTapGestao;
+  final VoidCallback onTapPlanejamentoMensal;
   final VoidCallback onTapClientes;
   final VoidCallback onTapAuditorias;
   final VoidCallback onTapAgenda;
@@ -1050,58 +1049,66 @@ class _HomeSideMenu extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Menu',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                          color: Color(0xFF9A9EAE),
+            SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Menu',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                            color: Color(0xFF9A9EAE),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Acessos rápidos',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.3,
-                          color: Color(0xFF1B1830),
+                        SizedBox(height: 4),
+                        Text(
+                          'Acessos rápidos',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.3,
+                            color: Color(0xFF1B1830),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: onClose,
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF6F6FA),
-                    foregroundColor: const Color(0xFF9A9EAE),
-                    minimumSize: const Size(32, 32),
-                    padding: EdgeInsets.zero,
+                  IconButton(
+                    onPressed: onClose,
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFF6F6FA),
+                      foregroundColor: const Color(0xFF9A9EAE),
+                      minimumSize: const Size(32, 32),
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const Icon(Icons.close, size: 18),
                   ),
-                  icon: const Icon(Icons.close, size: 18),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             _MenuEntry(
               icon: Icons.calendar_month,
               label: 'Gestão',
-              highlighted: true,
               onTap: onTapGestao,
+            ),
+            const SizedBox(height: 10),
+            _MenuEntry(
+              icon: Icons.event_note_outlined,
+              label: 'Planejamento mensal',
+              onTap: onTapPlanejamentoMensal,
             ),
             const SizedBox(height: 10),
             _MenuEntry(
@@ -1149,35 +1156,31 @@ class _MenuEntry extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.highlighted = false,
     this.trailing,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final bool highlighted;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = highlighted ? const Color(0xFFEEE9FF) : Colors.white;
-    final foregroundColor = highlighted ? const Color(0xFF7357D8) : const Color(0xFF34384A);
-    final iconColor = highlighted ? const Color(0xFF7357D8) : const Color(0xFF72778A);
+    const backgroundColor = Colors.white;
+    const foregroundColor = Color(0xFF34384A);
+    const iconColor = Color(0xFF7357D8);
 
     return Container(
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: highlighted
-            ? null
-            : const [
-                BoxShadow(
-                  color: Color(0x0F171A24),
-                  blurRadius: 24,
-                  offset: Offset(0, 8),
-                ),
-              ],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F171A24),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -1205,9 +1208,7 @@ class _MenuEntry extends StatelessWidget {
                     Icon(
                       Icons.chevron_right,
                       size: 18,
-                      color: highlighted
-                          ? const Color(0xFF7357D8)
-                          : const Color(0xFF9A9EAE),
+                      color: const Color(0xFF9A9EAE),
                     ),
               ],
             ),

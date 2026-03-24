@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -58,6 +58,7 @@ type ChecklistItem = {
   order: number;
   categoryName: string;
   description: string;
+  responsible: string;
   comment: string | null;
   status: string;
   statusClass: string;
@@ -80,13 +81,13 @@ function mapToHttpsError(error: unknown): HttpsError {
   const message = error instanceof Error ? error.message : String(error);
 
   if (message.includes('The query requires an index')) {
-    return new HttpsError('failed-precondition', 'Consulta do Firestore requer índice composto.');
+    return new HttpsError('failed-precondition', 'Consulta do Firestore requer Ã­ndice composto.');
   }
 
   if (message.includes('Permission') && message.includes('signBlob')) {
     return new HttpsError(
       'failed-precondition',
-      'Permissão insuficiente para assinar URL de download do PDF.'
+      'PermissÃ£o insuficiente para assinar URL de download do PDF.'
     );
   }
 
@@ -94,15 +95,15 @@ function mapToHttpsError(error: unknown): HttpsError {
     message.includes('Failed to launch the browser process') ||
     message.includes('Could not find Chrome')
   ) {
-    return new HttpsError('failed-precondition', 'Renderizador de PDF indisponível no servidor.');
+    return new HttpsError('failed-precondition', 'Renderizador de PDF indisponÃ­vel no servidor.');
   }
 
   if (message.includes('Memory limit')) {
-    return new HttpsError('failed-precondition', 'Limite de memória excedido durante geração do PDF.');
+    return new HttpsError('failed-precondition', 'Limite de memÃ³ria excedido durante geraÃ§Ã£o do PDF.');
   }
 
   if (message.includes('No such object')) {
-    return new HttpsError('not-found', 'Arquivo de foto não encontrado no Storage.');
+    return new HttpsError('not-found', 'Arquivo de foto nÃ£o encontrado no Storage.');
   }
 
   return new HttpsError('internal', 'Falha interna ao gerar PDF.');
@@ -180,7 +181,7 @@ function assertCanAccessAudit(
   const auditorRef = auditData['auditorRef'] as { id?: string } | undefined;
   const isOwnerAuditor = auditorRef?.id === uid;
   if (!isAdmin && !isOwnerAuditor) {
-    throw new HttpsError('permission-denied', 'Sem permissão para exportar esta auditoria.');
+    throw new HttpsError('permission-denied', 'Sem permissÃ£o para exportar esta auditoria.');
   }
 }
 
@@ -288,10 +289,10 @@ function buildScoreBars(items: Array<{ name: string; score: number }>): string {
     .map((item) => {
       const score = Number(item.score.toFixed(1));
       const cls = score >= 80 ? 'bar-good' : 'bar-bad';
-      return `<div class="category-bar-row">
-        <div class="category-bar-head">
-          <span class="category-name">${escapeHtml(item.name)}</span>
-          <span class="category-value">${score.toFixed(1)}%</span>
+      return `<div class="bar-row">
+        <div class="bar-head">
+          <div class="bar-label">${escapeHtml(item.name)}</div>
+          <div class="bar-value">${score.toFixed(1)}%</div>
         </div>
         <div class="bar-track">
           <div class="bar-fill ${cls}" style="width:${Math.max(0, Math.min(100, score)).toFixed(1)}%"></div>
@@ -529,13 +530,13 @@ export const generateAuditPdf = onCall(
         appId: request.app?.appId ?? null
       });
       if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'Usuário não autenticado.');
+        throw new HttpsError('unauthenticated', 'UsuÃ¡rio nÃ£o autenticado.');
       }
 
       const auditId =
         typeof request.data?.auditId === 'string' ? request.data.auditId.trim() : '';
       if (!auditId) {
-        throw new HttpsError('invalid-argument', 'auditId é obrigatório.');
+        throw new HttpsError('invalid-argument', 'auditId Ã© obrigatÃ³rio.');
       }
 
       const firestore = getFirestore();
@@ -548,7 +549,7 @@ export const generateAuditPdf = onCall(
       const auditRef = firestore.collection('audits').doc(auditId);
       const auditSnapshot = await auditRef.get();
       if (!auditSnapshot.exists) {
-        throw new HttpsError('not-found', 'Auditoria não encontrada.');
+        throw new HttpsError('not-found', 'Auditoria nÃ£o encontrada.');
       }
       endStage('fetch_audit');
 
@@ -756,6 +757,7 @@ export const generateAuditPdf = onCall(
           order: question.order,
           categoryName: sectionByPath.get(question.categoryPath)?.name ?? '-',
           description: question.text,
+          responsible: responsibleLabel(question.path, operatorQuestionPaths),
           comment:
             typeof answer?.['notes'] === 'string' && answer['notes'].trim().length > 0
               ? answer['notes'].trim()
@@ -771,7 +773,7 @@ export const generateAuditPdf = onCall(
         const comment =
           typeof notesValue === 'string' && notesValue.trim().length > 0
             ? notesValue.trim()
-            : 'Sem comentário.';
+            : 'Sem comentÃ¡rio.';
         const photoStats = questionPhotoStats.get(question.path);
         const photoUris = photoStats?.uris ?? [];
         const failedPhotos = photoStats?.failedCount ?? 0;
@@ -808,17 +810,27 @@ export const generateAuditPdf = onCall(
                           () => '<div class="photo-empty">Foto indisponível.</div>'
                         )
                       ].join('');
-                return `<div class="nonconform">
-                  <h3>Categoria: ${escapeHtml(item.categoryName)} - Questão ${item.order}</h3>
-                  <div class="label">Descrição da Pergunta:</div>
-                  <div class="value">${escapeHtml(item.questionText)}</div>
-                  <div class="label">Responsável:</div>
-                  <div class="value">${escapeHtml(item.responsible)}</div>
-                  <div class="label">Descrição da Auditora:</div>
-                  <div class="value">${escapeHtml(item.comment)}</div>
-                  <div class="label">Evidências Fotográficas:</div>
-                  <div class="photos">${photosHtml}</div>
-                </div>`;
+                return `<article class="nonconform">
+                  <div class="nonconform-header">Categoria: ${escapeHtml(item.categoryName)} - Questão ${item.order}</div>
+                  <div class="nonconform-grid">
+                    <div class="nonconform-item full">
+                      <div class="meta-label">Descrição da pergunta</div>
+                      <div class="meta-value">${escapeHtml(item.questionText)}</div>
+                    </div>
+                    <div class="nonconform-item">
+                      <div class="meta-label">Responsável</div>
+                      <div class="meta-value">${escapeHtml(item.responsible)}</div>
+                    </div>
+                    <div class="nonconform-item full">
+                      <div class="meta-label">Descrição do auditor</div>
+                      <div class="meta-value">${escapeHtml(item.comment)}</div>
+                    </div>
+                    <div class="nonconform-item full">
+                      <div class="meta-label">Evidências fotográficas</div>
+                      <div class="photos">${photosHtml}</div>
+                    </div>
+                  </div>
+                </article>`;
               })
               .join('');
 
@@ -828,8 +840,13 @@ export const generateAuditPdf = onCall(
             const commentHtml =
               item.comment == null
                 ? ''
-                : `<div class="checklist-comment"><span class="checklist-comment-label">Comentário:</span> ${escapeHtml(item.comment)}</div>`;
-            return `<tr><td>${item.order}</td><td>${escapeHtml(item.categoryName)}</td><td>${escapeHtml(item.description)}${commentHtml}</td><td class="${item.statusClass}">${escapeHtml(item.status)}</td></tr>`;
+                : `<span class="comment"><strong>Comentário do auditor:</strong> ${escapeHtml(item.comment)}</span>`;
+            return `<tr>
+              <td class="col-order">${item.order}</td>
+              <td class="col-category">${escapeHtml(item.categoryName)}</td>
+              <td><span class="question">${escapeHtml(item.description)}</span><span class="responsible"><strong>Responsável:</strong> ${escapeHtml(item.responsible)}</span>${commentHtml}</td>
+              <td class="col-status"><span class="status-badge ${item.statusClass}">${escapeHtml(item.status)}</span></td>
+            </tr>`;
           }
         )
         .join('');
@@ -968,3 +985,4 @@ export const generateAuditPdf = onCall(
     }
   }
 );
+

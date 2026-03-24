@@ -396,6 +396,20 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
     PlanningManagementMonthData data,
   ) {
     final items = _visibleItems(data);
+    if (_statusFilter == _ManagementFilter.pending) {
+      return <_ManagementSectionGroup>[
+        _ManagementSectionGroup(
+          title: 'Auditorias não agendadas',
+          items: items
+              .where(
+                (entry) =>
+                    entry.item.isPendingAgenda || entry.item.isAdminRejectedAgenda,
+              )
+              .toList(growable: false),
+        ),
+      ].where((section) => section.items.isNotEmpty).toList(growable: false);
+    }
+
     return <_ManagementSectionGroup>[
       _ManagementSectionGroup(
         title: 'Auditorias em validação',
