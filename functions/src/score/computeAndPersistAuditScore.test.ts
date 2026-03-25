@@ -16,6 +16,7 @@ function makeFirestoreMock(options: {
   answers?: Array<Record<string, unknown>>;
   questions?: Array<{ path: string; data: Record<string, unknown> }>;
   categories?: Array<{ path: string; data: Record<string, unknown> }>;
+  auditDataOverrides?: Record<string, unknown>;
 }) {
   const auditId = 'audit-1';
   const templateRef = { id: 'tpl-1', path: 'templates/tpl-1' };
@@ -52,7 +53,8 @@ function makeFirestoreMock(options: {
         clientRef,
         companyRef,
         status: 'in_progress',
-        auditorRef: { id: options.auditorUid ?? 'auditor-1' }
+        auditorRef: { id: options.auditorUid ?? 'auditor-1' },
+        ...options.auditDataOverrides
       } as Record<string, unknown>)
     : undefined;
 
@@ -242,5 +244,39 @@ describe('computeAndPersistAuditScoreHandler', () => {
         { firestore, now: () => fixedNow }
       )
     ).rejects.toMatchObject({ code: 'not-found' });
+  });
+
+  it('returns cached score without refetching answers when audit has not changed', async () => {
+    const updatedAt = new Date('2026-03-03T10:00:00.000Z');
+    const cachedScoredAt = new Date('2026-03-03T11:00:00.000Z');
+    const { firestore, writes, historyWrites, auditId, batch } = makeFirestoreMock({
+      auditExists: true,
+      role: 'admin',
+      auditDataOverrides: {
+        updated_at: updatedAt,
+        scoreComputedForUpdatedAt: updatedAt,
+        scoreFinal: 91.2,
+        scoreByCategory: {
+          'categories/c1': 88.4
+        },
+        scoreVersion: 1,
+        scoredAt: cachedScoredAt
+      }
+    });
+
+    const result = await computeAndPersistAuditScoreHandler(
+      { auth: { uid: 'u-admin' }, data: { auditId } },
+      { firestore, now: () => fixedNow }
+    );
+
+    expect(result.auditId).toBe(auditId);
+    expect(result.scoreFinal).toBe(91.2);
+    expect(result.scoreByCategoryCount).toBe(1);
+    expect(result.scoreVersion).toBe(1);
+    expect(result.scoredAt).toBe('2026-03-03T11:00:00.000Z');
+    expect(result.cached).toBe(true);
+    expect(writes).toHaveLength(0);
+    expect(historyWrites).toHaveLength(0);
+    expect(batch.commit).not.toHaveBeenCalled();
   });
 });

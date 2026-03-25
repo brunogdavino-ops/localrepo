@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import {
   DocumentReference,
+  FieldValue,
   QueryDocumentSnapshot,
   Timestamp,
   getFirestore
@@ -117,6 +118,56 @@ function asDate(value: unknown): Date | null {
     if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   return null;
+}
+
+function toMillis(value: unknown): number | null {
+  const parsed = asDate(value);
+  return parsed == null ? null : parsed.getTime();
+}
+
+async function resolvePdfAccessUrl(
+  file: any,
+  reportPath: string
+): Promise<{ url: string; expiresAt: string }> {
+  const expires = Date.now() + 60 * 60 * 1000;
+  try {
+    const [signedUrl] = await file.getSignedUrl({
+      action: 'read',
+      expires
+    });
+    return {
+      url: signedUrl,
+      expiresAt: new Date(expires).toISOString()
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes('signBlob')) {
+      throw error;
+    }
+
+    const [metadata] = await file.getMetadata();
+    const currentToken =
+      typeof metadata.metadata?.firebaseStorageDownloadTokens === 'string'
+        ? metadata.metadata.firebaseStorageDownloadTokens
+            .split(',')
+            .map((token: string) => token.trim())
+            .find((token: string) => token.length > 0) ?? ''
+        : '';
+    const token = currentToken || randomUUID();
+    if (!currentToken) {
+      await file.setMetadata({
+        metadata: {
+          ...(metadata.metadata ?? {}),
+          firebaseStorageDownloadTokens: token
+        }
+      });
+    }
+    const encodedPath = encodeURIComponent(reportPath);
+    return {
+      url: `https://firebasestorage.googleapis.com/v0/b/${file.bucket.name}/o/${encodedPath}?alt=media&token=${token}`,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    };
+  }
 }
 
 function datePtBr(date: Date | null): string {
@@ -560,6 +611,35 @@ export const generateAuditPdf = onCall(
       assertCanAccessAudit(uid, userData, auditData);
       endStage('authz');
 
+      const auditUpdatedAtMs = toMillis(auditData.updated_at ?? auditData.updatedAt);
+      const reportGeneratedForUpdatedAtMs = toMillis(auditData.reportGeneratedForUpdatedAt);
+      const cachedReportPath =
+        typeof auditData.reportPath === 'string' && auditData.reportPath.trim().length > 0
+          ? auditData.reportPath.trim()
+          : '';
+
+      if (
+        cachedReportPath &&
+        auditUpdatedAtMs != null &&
+        reportGeneratedForUpdatedAtMs != null &&
+        auditUpdatedAtMs <= reportGeneratedForUpdatedAtMs
+      ) {
+        markStage('reuse_pdf');
+        const cachedFile = storage.bucket().file(cachedReportPath);
+        const [exists] = await cachedFile.exists();
+        if (exists) {
+          const { url, expiresAt } = await resolvePdfAccessUrl(cachedFile, cachedReportPath);
+          endStage('reuse_pdf', { reportPath: cachedReportPath, cached: true });
+          console.info('[generateAuditPdf] cache_hit', { auditId, reportPath: cachedReportPath });
+          return { url, path: cachedReportPath, expiresAt, cached: true };
+        }
+        endStage('reuse_pdf', {
+          reportPath: cachedReportPath,
+          cached: false,
+          missingFile: true
+        });
+      }
+
       const templateRef = auditData['templateRef'] as DocumentReference | undefined;
       if (!templateRef) {
         throw new HttpsError('failed-precondition', 'Auditoria sem templateRef.');
@@ -923,43 +1003,28 @@ export const generateAuditPdf = onCall(
 
       markStage('upload_storage');
       const uploadStartMs = Date.now();
-      const timestamp = Date.now();
-      const reportPath = `audit_reports/${auditId}/audit_${timestamp}.pdf`;
+      const reportPath = `audit_reports/${auditId}/latest.pdf`;
       const file = storage.bucket().file(reportPath);
       await file.save(pdfBuffer, {
         contentType: 'application/pdf',
         resumable: false,
         metadata: { cacheControl: 'private, max-age=300' }
       });
+      await auditRef.set(
+        {
+          reportPath,
+          reportGeneratedAt: FieldValue.serverTimestamp(),
+          reportGeneratedForUpdatedAt:
+            auditUpdatedAtMs == null ? FieldValue.serverTimestamp() : new Date(auditUpdatedAtMs)
+        },
+        { merge: true }
+      );
       endStage('upload_storage', { reportPath });
       const uploadStorageMs = Date.now() - uploadStartMs;
 
       markStage('signed_url');
-      const expires = Date.now() + 60 * 60 * 1000;
-      let url: string;
-      let expiresAt: string;
-      try {
-        const [signedUrl] = await file.getSignedUrl({
-          action: 'read',
-          expires
-        });
-        url = signedUrl;
-        expiresAt = new Date(expires).toISOString();
-        endStage('signed_url');
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes('signBlob')) {
-          throw error;
-        }
-        const token = randomUUID();
-        await file.setMetadata({
-          metadata: { firebaseStorageDownloadTokens: token }
-        });
-        const encodedPath = encodeURIComponent(reportPath);
-        url = `https://firebasestorage.googleapis.com/v0/b/${storage.bucket().name}/o/${encodedPath}?alt=media&token=${token}`;
-        expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        endStage('signed_url', { fallbackToken: true });
-      }
+      const { url, expiresAt } = await resolvePdfAccessUrl(file, reportPath);
+      endStage('signed_url');
 
       const totalElapsedMs = Date.now() - startedAtMs;
       const pdfSizeBytes = pdfBuffer.length;
@@ -975,7 +1040,7 @@ export const generateAuditPdf = onCall(
         pdfSizeBytes
       });
       console.info('[generateAuditPdf] done', { totalElapsedMs });
-      return { url, path: reportPath, expiresAt };
+      return { url, path: reportPath, expiresAt, cached: false };
     } catch (error) {
       console.error('[generateAuditPdf] falha', {
         totalElapsedMs: Date.now() - startedAtMs,

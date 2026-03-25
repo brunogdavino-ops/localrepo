@@ -25,6 +25,7 @@ interface ComputeAuditScoreResponse {
   scoreByCategoryCount: number;
   scoreVersion: number;
   scoredAt: string;
+  cached?: boolean;
 }
 
 type FirestoreLike = ReturnType<typeof getFirestore>;
@@ -52,6 +53,31 @@ interface PersistScoreResult {
   computeScoreMs: number;
   persistScoreMs: number;
   upsertHistoryMs: number;
+  cached?: boolean;
+  scoredAtIso?: string;
+}
+
+function asDate(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (
+    value != null &&
+    typeof value === 'object' &&
+    'toDate' in value &&
+    typeof (value as { toDate?: unknown }).toDate === 'function'
+  ) {
+    const converted = (value as { toDate: () => Date }).toDate();
+    return converted instanceof Date ? converted : null;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
+function toMillis(value: unknown): number | null {
+  const parsed = asDate(value);
+  return parsed == null ? null : parsed.getTime();
 }
 
 export async function computeAndPersistScoreForAudit(
@@ -64,6 +90,49 @@ export async function computeAndPersistScoreForAudit(
   const templateRef = auditData.templateRef as DocumentReference | undefined;
   if (!templateRef) {
     throw new HttpsError('failed-precondition', 'Auditoria sem templateRef.');
+  }
+
+  const auditUpdatedAtMs = toMillis(auditData.updated_at);
+  const scoreComputedForUpdatedAtMs = toMillis(auditData.scoreComputedForUpdatedAt);
+  const existingScoreFinal =
+    typeof auditData.scoreFinal === 'number'
+      ? auditData.scoreFinal
+      : typeof auditData.score === 'number'
+      ? auditData.score
+      : null;
+  const existingScoreByCategory =
+    auditData.scoreByCategory != null && typeof auditData.scoreByCategory === 'object'
+      ? Object.entries(auditData.scoreByCategory as Record<string, unknown>).reduce<Record<string, number>>(
+          (acc, [key, value]) => {
+            if (typeof value === 'number') {
+              acc[key] = value;
+            }
+            return acc;
+          },
+          {}
+        )
+      : {};
+  const existingScoreVersion =
+    typeof auditData.scoreVersion === 'number' ? auditData.scoreVersion : 1;
+  const existingScoredAt = asDate(auditData.scoredAt);
+
+  if (
+    auditUpdatedAtMs != null &&
+    scoreComputedForUpdatedAtMs != null &&
+    auditUpdatedAtMs <= scoreComputedForUpdatedAtMs &&
+    existingScoreFinal != null
+  ) {
+    return {
+      scoreFinal: existingScoreFinal,
+      scoreByCategory: existingScoreByCategory,
+      scoreVersion: existingScoreVersion,
+      fetchFirestoreMs: 0,
+      computeScoreMs: 0,
+      persistScoreMs: 0,
+      upsertHistoryMs: 0,
+      cached: true,
+      scoredAtIso: existingScoredAt?.toISOString()
+    };
   }
 
   const fetchStartMs = Date.now();
@@ -106,7 +175,9 @@ export async function computeAndPersistScoreForAudit(
       scoreFinal,
       scoreByCategory,
       scoreVersion,
-      scoredAt: FieldValue.serverTimestamp()
+      scoredAt: FieldValue.serverTimestamp(),
+      scoreComputedForUpdatedAt:
+        auditUpdatedAtMs == null ? FieldValue.serverTimestamp() : new Date(auditUpdatedAtMs)
     },
     { merge: true }
   );
@@ -189,6 +260,7 @@ export async function computeAndPersistAuditScoreHandler(
   console.info('[computeAndPersistAuditScore] perf', {
     auditId,
     authFetchMs,
+    cached: result.cached === true,
     fetchFirestoreMs: result.fetchFirestoreMs,
     computeScoreMs: result.computeScoreMs,
     persistScoreMs: result.persistScoreMs,
@@ -201,7 +273,8 @@ export async function computeAndPersistAuditScoreHandler(
     scoreFinal: result.scoreFinal,
     scoreByCategoryCount: Object.keys(result.scoreByCategory).length,
     scoreVersion: result.scoreVersion,
-    scoredAt
+    scoredAt: result.scoredAtIso ?? scoredAt,
+    cached: result.cached === true
   };
 }
 

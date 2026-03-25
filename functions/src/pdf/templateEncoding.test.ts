@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+﻿import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 describe('audit-report template encoding', () => {
@@ -7,8 +7,8 @@ describe('audit-report template encoding', () => {
     const html = readFileSync(templatePath, 'utf8');
 
     expect(html).toContain('Relatório de Auditoria Sanitária');
-    expect(html).toContain('Não Conformidades Identificadas');
-    expect(html).toContain('Conclusão Técnica');
+    expect(html).toContain('Não conformidades identificadas');
+    expect(html).toContain('Conclusão técnica');
     expect(html).toContain('Classificação');
   });
 });
