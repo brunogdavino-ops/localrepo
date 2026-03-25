@@ -64,6 +64,7 @@ class MonthlyPlanningService {
         .map((doc) {
           final data = doc.data();
           final auditorRef = data['auditorRef'] as DocumentReference?;
+          final importedLastAuditDate = (data['lastAuditDate'] as Timestamp?)?.toDate();
           return PlanningClientOption(
             id: doc.id,
             ref: doc.reference,
@@ -71,7 +72,7 @@ class MonthlyPlanningService {
             auditorRef: auditorRef,
             auditorName: _resolveAuditorName(auditorRef, auditors),
             auditRecurrence: (data['auditrecurrence'] as String?)?.trim(),
-            lastAuditDate: latestAuditDatesByClientId[doc.id],
+            lastAuditDate: latestAuditDatesByClientId[doc.id] ?? importedLastAuditDate,
           );
         })
         .toList()

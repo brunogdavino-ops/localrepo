@@ -1,0 +1,182 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentUserPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function currentUserDoc() {
+      return get(currentUserPath());
+    }
+
+    function currentUserData() {
+      return currentUserDoc().data;
+    }
+
+    function currentUserRole() {
+      return signedIn() && exists(currentUserPath())
+        ? currentUserData().role
+        : null;
+    }
+
+    function isAdmin() {
+      return signedIn() && currentUserRole() in ['admin', 'owner', 'super_admin'];
+    }
+
+    function isAuditoria() {
+      return signedIn() && currentUserRole() == 'auditoria';
+    }
+
+    function currentUserCompanyRef() {
+      return signedIn() && exists(currentUserPath())
+        ? currentUserData().companyref
+        : null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function sameClientCompany(data) {
+      return signedIn() && data.companyref == currentUserCompanyRef();
+    }
+
+    function samePlanCompany(data) {
+      return signedIn() && data.companyRef == currentUserCompanyRef();
+    }
+
+    function isAuditOwner(data) {
+      return signedIn() && data.auditorRef == currentUserPath();
+    }
+
+    function canReadAuditDoc(data) {
+      return signedIn() && (isAdmin() || isAuditOwner(data));
+    }
+
+    function auditParent(auditId) {
+      return get(/databases/$(database)/documents/audits/$(auditId));
+    }
+
+    function auditParentExists(auditId) {
+      return exists(/databases/$(database)/documents/audits/$(auditId));
+    }
+
+    function canReadAuditSubdoc(auditId) {
+      return signedIn() && auditParentExists(auditId) &&
+        canReadAuditDoc(auditParent(auditId).data);
+    }
+
+    function canWriteMonthlyPlanItem() {
+      return signedIn() && (
+        isAdmin() ||
+        (
+          isAuditoria() &&
+          request.resource != null &&
+          request.resource.data.auditorRef == currentUserPath()
+        )
+      );
+    }
+
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isSelf(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /clients/{clientId} {
+      allow get, list: if signedIn() && sameClientCompany(resource.data);
+      allow create: if isAdmin() &&
+        request.resource != null &&
+        sameClientCompany(request.resource.data);
+      allow update, delete: if isAdmin() && sameClientCompany(resource.data);
+
+      match /score_history/{historyId} {
+        allow get, list: if signedIn() && sameClientCompany(get(/databases/$(database)/documents/clients/$(clientId)).data);
+        allow write: if false;
+      }
+    }
+
+    match /companies/{companyId} {
+      allow get, list: if signedIn();
+      allow write: if false;
+    }
+
+    match /templates/{templateId} {
+      allow get, list: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow get, list: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /questions/{questionId} {
+      allow get, list: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /counters/{counterId} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create, update: if signedIn() && counterId == 'audits';
+      allow delete: if false;
+    }
+
+    match /audits/{auditId} {
+      allow get, list: if signedIn() && canReadAuditDoc(resource.data);
+      allow create: if signedIn() && (
+        isAdmin() ||
+        (
+          isAuditoria() &&
+          request.resource != null &&
+          isAuditOwner(request.resource.data)
+        )
+      );
+      allow update: if signedIn() && (
+        isAdmin() ||
+        (
+          isAuditoria() &&
+          resource != null &&
+          isAuditOwner(resource.data)
+        )
+      );
+      allow delete: if isAdmin();
+
+      match /answers/{answerId} {
+        allow get, list: if canReadAuditSubdoc(auditId);
+        allow create, update, delete: if canReadAuditSubdoc(auditId);
+
+        match /photos/{photoId} {
+          allow get, list: if canReadAuditSubdoc(auditId);
+          allow create, update, delete: if canReadAuditSubdoc(auditId);
+        }
+      }
+    }
+
+    match /monthly_plans/{monthKey} {
+      allow get, list: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow get, list: if signedIn() && (
+          (isAdmin() && samePlanCompany(resource.data)) ||
+          (isAuditoria() && resource.data.auditorRef == currentUserPath())
+        );
+        allow create, update: if canWriteMonthlyPlanItem() && (
+          (isAdmin() && request.resource != null && samePlanCompany(request.resource.data)) ||
+          (isAuditoria() && request.resource != null && request.resource.data.auditorRef == currentUserPath())
+        );
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}
