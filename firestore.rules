@@ -163,7 +163,14 @@ service cloud.firestore {
 
     match /monthly_plans/{monthKey} {
       allow get, list: if isAdmin();
-      allow create, update: if isAdmin();
+      allow create, update: if
+        (isAdmin()) ||
+        (
+          signedIn() &&
+          request.resource != null &&
+          request.resource.data.monthKey == monthKey &&
+          request.resource.data.updatedBy == currentUserPath()
+        );
       allow delete: if false;
 
       match /items/{itemId} {

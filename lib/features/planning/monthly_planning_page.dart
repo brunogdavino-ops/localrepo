@@ -176,6 +176,15 @@ class _MonthlyPlanningPageState extends State<MonthlyPlanningPage> {
           status: existing?.isCancelled == true ? 'planned' : (existing?.status ?? 'planned'),
           sentAt: existing?.isCancelled == true ? null : existing?.sentAt,
           cancelledAt: null,
+          agendaStatus: existing?.isCancelled == true
+              ? 'pending'
+              : (existing?.agendaStatus ?? 'pending'),
+          proposedDate: existing?.isCancelled == true ? null : existing?.proposedDate,
+          confirmedDate: existing?.isCancelled == true ? null : existing?.confirmedDate,
+          rejectedDates: existing?.isCancelled == true
+              ? const []
+              : existing?.rejectedDates,
+          unavailableAt: existing?.isCancelled == true ? null : existing?.unavailableAt,
           auditorRef: existing?.auditorRef ?? selectedClient.auditorRef,
           auditorName: existing?.auditorName ?? selectedClient.auditorName,
           auditRecurrence: selectedClient.auditRecurrence,
@@ -240,6 +249,10 @@ class _MonthlyPlanningPageState extends State<MonthlyPlanningPage> {
         status: 'sent',
         sentAt: DateTime.now(),
         cancelledAt: null,
+        agendaStatus: 'pending',
+        proposedDate: null,
+        confirmedDate: null,
+        unavailableAt: null,
       ),
     );
   }
@@ -259,7 +272,15 @@ class _MonthlyPlanningPageState extends State<MonthlyPlanningPage> {
     final updatedItems = data.items
         .map(
           (item) => eligibleIds.contains(item.id)
-              ? item.copyWith(status: 'sent', sentAt: now, cancelledAt: null)
+              ? item.copyWith(
+                  status: 'sent',
+                  sentAt: now,
+                  cancelledAt: null,
+                  agendaStatus: 'pending',
+                  proposedDate: null,
+                  confirmedDate: null,
+                  unavailableAt: null,
+                )
               : item,
         )
         .toList(growable: false);
@@ -283,6 +304,11 @@ class _MonthlyPlanningPageState extends State<MonthlyPlanningPage> {
         status: 'cancelled',
         cancelledAt: DateTime.now(),
         included: false,
+        agendaStatus: 'pending',
+        proposedDate: null,
+        confirmedDate: null,
+        rejectedDates: const [],
+        unavailableAt: null,
       ),
     );
   }

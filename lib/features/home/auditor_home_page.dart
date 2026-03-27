@@ -104,13 +104,31 @@ class _AuditorHomePageState extends State<AuditorHomePage> {
     final today = DateTime.now();
     final startDate = DateTime(today.year, today.month, today.day);
     final endDate = startDate.add(const Duration(days: 6));
-    final weekEntries = await _planningService.loadAuditorConfirmedAgendaWeek(
-      startDate: startDate,
-      endDate: endDate,
-    );
+    final auditorRef = _firestore.collection('users').doc(user.uid);
+    List<ConfirmedAgendaEntry> pendingReportEntries;
+    try {
+      pendingReportEntries = await _planningService.loadOverdueConfirmedAgendaEntries(
+        referenceDate: today,
+        auditorRef: auditorRef,
+        overdueLagDays: 0,
+      );
+    } catch (error) {
+      throw StateError('Falha em Relatórios pendentes: $error');
+    }
+
+    List<ConfirmedAgendaEntry> weekEntries;
+    try {
+      weekEntries = await _planningService.loadAuditorConfirmedAgendaWeek(
+        startDate: startDate,
+        endDate: endDate,
+      );
+    } catch (error) {
+      throw StateError('Falha em Agenda da semana: $error');
+    }
 
     return _AuditorHomeData(
       firstName: firstName,
+      pendingReportEntries: pendingReportEntries,
       weekEntries: weekEntries,
     );
   }
@@ -263,6 +281,7 @@ class _AuditorHomePageState extends State<AuditorHomePage> {
             final title = (data.firstName == null || data.firstName!.isEmpty)
                 ? '$greeting!'
                 : '$greeting, ${data.firstName}!';
+            final pendingReportEntries = data.pendingReportEntries;
             final groupedEntries = _groupWeekEntries(data.weekEntries);
 
             return RefreshIndicator(
@@ -393,6 +412,30 @@ class _AuditorHomePageState extends State<AuditorHomePage> {
                             onTap: () => _openPage(const NewAuditPage()),
                           ),
                           const SizedBox(height: 28),
+                          if (pendingReportEntries.isNotEmpty) ...[
+                            Text(
+                              'Relatórios pendentes',
+                              style: _inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF9A9EAE),
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ...pendingReportEntries.map(
+                              (entry) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _AuditorWeekAgendaCard(
+                                  entry: entry,
+                                  isStarting: _startingEntryId == entry.item.id,
+                                  buttonLabel: 'Iniciar relatório',
+                                  onTap: () => _startAuditFromEntry(entry),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           Text(
                             'Agenda da semana',
                             style: _inter(
@@ -458,10 +501,12 @@ class _AuditorHomePageState extends State<AuditorHomePage> {
 class _AuditorHomeData {
   const _AuditorHomeData({
     required this.firstName,
+    required this.pendingReportEntries,
     required this.weekEntries,
   });
 
   final String? firstName;
+  final List<ConfirmedAgendaEntry> pendingReportEntries;
   final List<ConfirmedAgendaEntry> weekEntries;
 }
 
@@ -640,11 +685,13 @@ class _AuditorWeekAgendaCard extends StatelessWidget {
     required this.entry,
     required this.isStarting,
     required this.onTap,
+    this.buttonLabel,
   });
 
   final ConfirmedAgendaEntry entry;
   final bool isStarting;
   final VoidCallback onTap;
+  final String? buttonLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -694,6 +741,18 @@ class _AuditorWeekAgendaCard extends StatelessWidget {
                           color: Color(0xFF72778A),
                         ),
                       ),
+                      if (buttonLabel != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          buttonLabel!,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF7357D8),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

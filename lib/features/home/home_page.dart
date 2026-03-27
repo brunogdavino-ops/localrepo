@@ -92,10 +92,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   bool _isUnscheduled(MonthlyPlanItem item) {
-    return !item.isPendingConfirmation &&
-        !item.isConfirmedAgenda &&
-        !item.isAdminRejectedAgenda &&
-        !item.isUnavailableAgenda &&
+    return item.isSent &&
+        item.isPendingAgenda &&
         !item.isCancelled;
   }
 
@@ -133,7 +131,7 @@ class _HomePageState extends State<HomePage> {
         .collection('monthly_plans')
         .doc(monthKey)
         .collection('items')
-        .where('status', whereIn: const ['planned', 'sent']);
+        .where('status', isEqualTo: 'sent');
     if (companyRef != null) {
       monthItemsQuery = monthItemsQuery.where('companyRef', isEqualTo: companyRef);
     }

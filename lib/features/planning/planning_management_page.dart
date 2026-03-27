@@ -119,7 +119,7 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
   bool _matchesFilter(MonthlyPlanItem item, _ManagementFilter filter) {
     switch (filter) {
       case _ManagementFilter.total:
-        return true;
+        return item.isSent;
       case _ManagementFilter.confirmed:
         return item.isConfirmedAgenda;
       case _ManagementFilter.rejected:
@@ -127,7 +127,7 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
       case _ManagementFilter.progress:
         return item.isPendingConfirmation;
       case _ManagementFilter.pending:
-        return item.isPendingAgenda || item.isAdminRejectedAgenda;
+        return item.isSent && (item.isPendingAgenda || item.isAdminRejectedAgenda);
     }
   }
 
@@ -392,6 +392,75 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
     return 'Todos os auditores';
   }
 
+  bool _hasSpecificAuditorFilter() => _auditorFilterPath != 'all';
+
+  List<PlanningManagementItem> _auditorMessageItems(PlanningManagementMonthData data) {
+    if (!_hasSpecificAuditorFilter()) return const [];
+    return _auditorScopedItems(data)
+        .where((entry) => entry.item.isSent)
+        .where((entry) => entry.item.isPendingAgenda || entry.item.isAdminRejectedAgenda)
+        .toList(growable: false);
+  }
+
+  String _firstName(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return '';
+    return trimmed.split(RegExp(r'\s+')).first.trim();
+  }
+
+  String _buildAuditorBatchMessage(
+    String auditorName,
+    List<PlanningManagementItem> items,
+  ) {
+    final firstName = _firstName(auditorName);
+    final greetingName = firstName.isEmpty ? auditorName.trim() : firstName;
+    final buffer = StringBuffer()
+      ..write('Olá')
+      ..write(greetingName.isEmpty ? '!' : ', $greetingName!')
+      ..write('\n\n')
+      ..write('Preciso da sua ajuda com algumas auditorias:\n\n');
+
+    for (var index = 0; index < items.length; index++) {
+      final entry = items[index];
+      final item = entry.item;
+      buffer
+        ..write('${index + 1}. ${item.clientName}\n')
+        ..write(
+          item.isAdminRejectedAgenda
+              ? 'A data anterior foi recusada pelo cliente. Você consegue enviar uma nova sugestão?\n\n'
+              : 'Ainda está sem agendamento. Você consegue me enviar uma proposta de data?\n\n',
+        );
+    }
+
+    buffer.write('Obrigada!');
+    return buffer.toString();
+  }
+
+  Future<void> _openAuditorBatchMessage(PlanningManagementMonthData data) async {
+    final items = _auditorMessageItems(data);
+    if (items.isEmpty) return;
+    final auditorName = _auditorFilterLabel(data);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MessageSheet(
+        headerLabel: 'MENSAGEM PARA AUDITORA',
+        clientName: auditorName,
+        sections: [
+          _MessageSection(
+            label: 'AUDITORIAS QUE PRECISAM DE AÇÃO',
+            value: '${items.length} ${items.length == 1 ? 'item' : 'itens'} neste mês',
+          ),
+        ],
+        message: _buildAuditorBatchMessage(auditorName, items),
+        editableMessage: true,
+        messageLabel: 'TEXTO PARA WHATSAPP',
+        copyMessageLabel: 'Mensagem copiada',
+      ),
+    );
+  }
+
   List<_ManagementSectionGroup> _groupVisibleItems(
     PlanningManagementMonthData data,
   ) {
@@ -403,7 +472,8 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
           items: items
               .where(
                 (entry) =>
-                    entry.item.isPendingAgenda || entry.item.isAdminRejectedAgenda,
+                    entry.item.isSent &&
+                    (entry.item.isPendingAgenda || entry.item.isAdminRejectedAgenda),
               )
               .toList(growable: false),
         ),
@@ -419,6 +489,7 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
         title: 'Auditorias não agendadas',
         items: items
             .where((entry) =>
+                entry.item.isSent &&
                 !entry.item.isPendingConfirmation &&
                 !entry.item.isConfirmedAgenda &&
                 !entry.item.isAdminRejectedAgenda &&
@@ -443,6 +514,7 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
   @override
   Widget build(BuildContext context) {
     final data = _monthData;
+    final auditorMessageItems = data == null ? const <PlanningManagementItem>[] : _auditorMessageItems(data);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
         statusBarColor: Colors.white,
@@ -547,10 +619,30 @@ class _PlanningManagementPageState extends State<PlanningManagementPage> {
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  TextButton.icon(
-                                    onPressed: _pickAuditor,
-                                    icon: const Icon(Icons.person_search_outlined, size: 18),
-                                    label: Text(_auditorFilterLabel(data)),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: TextButton.icon(
+                                            onPressed: _pickAuditor,
+                                            icon: const Icon(Icons.person_search_outlined, size: 18),
+                                            label: Text(_auditorFilterLabel(data)),
+                                          ),
+                                        ),
+                                      ),
+                                      if (_hasSpecificAuditorFilter() && auditorMessageItems.isNotEmpty)
+                                        IconButton(
+                                          onPressed: () => _openAuditorBatchMessage(data),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: const Color(0xFFEEE9FF),
+                                            foregroundColor: _brand,
+                                            minimumSize: const Size(32, 32),
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          icon: const Icon(Icons.content_copy_outlined, size: 18),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -1484,67 +1576,82 @@ class _OptionSheet<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxSheetHeight = screenHeight * 0.82;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [
-            BoxShadow(color: Color(0x1F171A24), blurRadius: 40, offset: Offset(0, 16)),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1B1830),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [
+              BoxShadow(color: Color(0x1F171A24), blurRadius: 40, offset: Offset(0, 16)),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1B1830),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                ...options.map(
-                  (option) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Material(
-                      color: const Color(0xFFF6F6FA),
-                      borderRadius: BorderRadius.circular(18),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(18),
-                        onTap: () => Navigator.of(context).pop(option.value),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  option.label,
-                                  style: const TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF34384A),
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: options
+                            .map(
+                              (option) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Material(
+                                  color: const Color(0xFFF6F6FA),
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(18),
+                                    onTap: () => Navigator.of(context).pop(option.value),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              option.label,
+                                              style: const TextStyle(
+                                                fontFamily: 'Inter',
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF34384A),
+                                              ),
+                                            ),
+                                          ),
+                                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFF9A9EAE)),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                              const Icon(Icons.chevron_right, size: 18, color: Color(0xFF9A9EAE)),
-                            ],
-                          ),
-                        ),
+                            )
+                            .toList(growable: false),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1574,3 +1681,5 @@ class _AuditorPickerSheet extends StatelessWidget {
     );
   }
 }
+
+

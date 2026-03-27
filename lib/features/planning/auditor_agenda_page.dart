@@ -822,6 +822,8 @@ class _SuggestDateSheetState extends State<_SuggestDateSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxSheetHeight = screenHeight * 0.82;
     final lastDay = DateTime(widget.month.year, widget.month.month + 1, 0);
     final days = [for (int day = 1; day <= lastDay.day; day++) DateTime(widget.month.year, widget.month.month, day)];
 
@@ -833,6 +835,7 @@ class _SuggestDateSheetState extends State<_SuggestDateSheet> {
       final normalized = _normalize(eventDate);
       countsByDay[normalized] = (countsByDay[normalized] ?? 0) + 1;
     }
+    final hasMarkedDays = countsByDay.isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
@@ -947,23 +950,25 @@ class _SuggestDateSheetState extends State<_SuggestDateSheet> {
                         }).toList(growable: false),
                       ),
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          if (widget.item.item.isRejectedAgenda)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                              decoration: BoxDecoration(color: const Color(0xFFFDECEC), borderRadius: BorderRadius.circular(999)),
-                              child: const Text('Recusada', style: TextStyle(fontFamily: 'Inter', fontSize: 10, color: Color(0xFFE14C4C))),
-                            ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            decoration: BoxDecoration(color: const Color(0xFFECF2FF), borderRadius: BorderRadius.circular(999)),
-                            child: const Text('Dias com auditorias já propostas/confirmadas', style: TextStyle(fontFamily: 'Inter', fontSize: 10, color: Color(0xFF4A7AE8))),
-                          ),
-                        ],
-                      ),
+                      if (widget.item.item.isRejectedAgenda || hasMarkedDays)
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            if (widget.item.item.isRejectedAgenda)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                decoration: BoxDecoration(color: const Color(0xFFFDECEC), borderRadius: BorderRadius.circular(999)),
+                                child: const Text('Recusada', style: TextStyle(fontFamily: 'Inter', fontSize: 10, color: Color(0xFFE14C4C))),
+                              ),
+                            if (hasMarkedDays)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                decoration: BoxDecoration(color: const Color(0xFFECF2FF), borderRadius: BorderRadius.circular(999)),
+                                child: const Text('Dias com auditorias já propostas/confirmadas', style: TextStyle(fontFamily: 'Inter', fontSize: 10, color: Color(0xFF4A7AE8))),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -1184,6 +1189,8 @@ class _AgendaCalendarSheetState extends State<_AgendaCalendarSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxSheetHeight = screenHeight * 0.82;
     final lastDay = DateTime(widget.month.year, widget.month.month + 1, 0);
     final days = [for (int day = 1; day <= lastDay.day; day++) DateTime(widget.month.year, widget.month.month, day)];
 
@@ -1199,135 +1206,140 @@ class _AgendaCalendarSheetState extends State<_AgendaCalendarSheet> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [BoxShadow(color: Color(0x1F171A24), blurRadius: 40, offset: Offset(0, 16))],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [BoxShadow(color: Color(0x1F171A24), blurRadius: 40, offset: Offset(0, 16))],
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Calendário do mês', style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF9A9EAE), letterSpacing: 1.1)),
-                          const SizedBox(height: 8),
-                          Text(widget.formatMonthLabel(widget.month), style: const TextStyle(fontFamily: 'Inter', fontSize: 22, fontWeight: FontWeight.w600, color: Color(0xFF1B1830), letterSpacing: -0.4)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFF6F6FA), foregroundColor: const Color(0xFF9A9EAE), minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
-                      icon: const Icon(Icons.close, size: 18),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: const Color(0xFFF6F6FA), borderRadius: BorderRadius.circular(22)),
-                  child: Column(
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('D', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                          Text('S', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                          Text('T', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                          Text('Q', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                          Text('Q', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                          Text('S', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                          Text('S', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: days.map((day) {
-                          final normalized = _normalize(day);
-                          final count = itemsByDay[normalized]?.length ?? 0;
-                          final selected = _selectedDay != null && DateUtils.isSameDay(_selectedDay, normalized);
-                          return InkWell(
-                            onTap: count == 0 ? null : () => setState(() => _selectedDay = normalized),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              width: 44,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: selected || count > 0 ? const Color(0xFFEEE9FF) : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              padding: const EdgeInsets.all(6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${day.day}', style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: count > 0 ? const Color(0xFF7357D8) : const Color(0xFF9A9EAE))),
-                                  const Spacer(),
-                                  if (count > 0)
-                                    Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: Container(
-                                        width: 22,
-                                        height: 22,
-                                        decoration: const BoxDecoration(color: Color(0xFF7357D8), shape: BoxShape.circle),
-                                        alignment: Alignment.center,
-                                        child: Text('$count', style: const TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(growable: false),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_selectedDay != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: const Color(0xFFF6F6FA), borderRadius: BorderRadius.circular(18)),
-                    child: Column(
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _selectedDay == null ? '' : '${_selectedDay!.day.toString().padLeft(2, '0')} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][_selectedDay!.month - 1]} ${_selectedDay!.year.toString().substring(2)}',
-                          style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF9A9EAE), letterSpacing: 1.1),
-                        ),
-                        const SizedBox(height: 10),
-                        ...selectedItems.map(
-                          (agendaItem) => Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(agendaItem.item.clientName, style: const TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1B1830))),
-                                const SizedBox(height: 4),
-                                Text(agendaItem.clientAddress, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, height: 1.5, color: Color(0xFF72778A))),
-                              ],
-                            ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Calendário do mês', style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF9A9EAE), letterSpacing: 1.1)),
+                              const SizedBox(height: 8),
+                              Text(widget.formatMonthLabel(widget.month), style: const TextStyle(fontFamily: 'Inter', fontSize: 22, fontWeight: FontWeight.w600, color: Color(0xFF1B1830), letterSpacing: -0.4)),
+                            ],
                           ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: IconButton.styleFrom(backgroundColor: const Color(0xFFF6F6FA), foregroundColor: const Color(0xFF9A9EAE), minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
+                          icon: const Icon(Icons.close, size: 18),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ],
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: const Color(0xFFF6F6FA), borderRadius: BorderRadius.circular(22)),
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('D', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                              Text('S', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                              Text('T', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                              Text('Q', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                              Text('Q', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                              Text('S', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                              Text('S', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: Color(0xFF9A9EAE))),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: days.map((day) {
+                              final normalized = _normalize(day);
+                              final count = itemsByDay[normalized]?.length ?? 0;
+                              final selected = _selectedDay != null && DateUtils.isSameDay(_selectedDay, normalized);
+                              return InkWell(
+                                onTap: count == 0 ? null : () => setState(() => _selectedDay = normalized),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: 44,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: selected || count > 0 ? const Color(0xFFEEE9FF) : Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.all(6),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('${day.day}', style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: count > 0 ? const Color(0xFF7357D8) : const Color(0xFF9A9EAE))),
+                                      const Spacer(),
+                                      if (count > 0)
+                                        Align(
+                                          alignment: Alignment.bottomCenter,
+                                          child: Container(
+                                            width: 22,
+                                            height: 22,
+                                            decoration: const BoxDecoration(color: Color(0xFF7357D8), shape: BoxShape.circle),
+                                            alignment: Alignment.center,
+                                            child: Text('$count', style: const TextStyle(fontFamily: 'Inter', fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(growable: false),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_selectedDay != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: const Color(0xFFF6F6FA), borderRadius: BorderRadius.circular(18)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedDay == null ? '' : '${_selectedDay!.day.toString().padLeft(2, '0')} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][_selectedDay!.month - 1]} ${_selectedDay!.year.toString().substring(2)}',
+                              style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF9A9EAE), letterSpacing: 1.1),
+                            ),
+                            const SizedBox(height: 10),
+                            ...selectedItems.map(
+                              (agendaItem) => Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(agendaItem.item.clientName, style: const TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1B1830))),
+                                    const SizedBox(height: 4),
+                                    Text(agendaItem.clientAddress, style: const TextStyle(fontFamily: 'Inter', fontSize: 12, height: 1.5, color: Color(0xFF72778A))),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),

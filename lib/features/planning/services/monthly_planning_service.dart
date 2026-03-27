@@ -534,10 +534,12 @@ class MonthlyPlanningService {
   Future<int> countOverdueConfirmedOccurrences({
     required DateTime referenceDate,
     DocumentReference? companyRef,
+    int overdueLagDays = 3,
   }) async {
     final entries = await loadOverdueConfirmedAgendaEntries(
       referenceDate: referenceDate,
       companyRef: companyRef,
+      overdueLagDays: overdueLagDays,
     );
     return entries.length;
   }
@@ -545,52 +547,151 @@ class MonthlyPlanningService {
   Future<List<ConfirmedAgendaEntry>> loadOverdueConfirmedAgendaEntries({
     required DateTime referenceDate,
     DocumentReference? companyRef,
+    DocumentReference? auditorRef,
+    int overdueLagDays = 3,
   }) async {
     final threshold = DateTime(
       referenceDate.year,
       referenceDate.month,
       referenceDate.day,
-    ).subtract(const Duration(days: 3));
+    ).subtract(Duration(days: overdueLagDays));
     final auditDatesCache = <String, List<DateTime>>{};
     final entries = <ConfirmedAgendaEntry>[];
 
-    Query<Map<String, dynamic>> itemsQuery = _firestore
-        .collectionGroup('items')
-        .where('agendaStatus', isEqualTo: 'confirmed');
-    if (companyRef != null) {
-      itemsQuery = itemsQuery.where('companyRef', isEqualTo: companyRef);
-    }
-    final itemsSnapshot = await itemsQuery.get();
+    if (auditorRef != null) {
+      final monthKeys = <String>{
+        formatMonthKey(DateTime(referenceDate.year, referenceDate.month)),
+        formatMonthKey(DateTime(referenceDate.year, referenceDate.month - 1)),
+      };
 
-    for (final itemDoc in itemsSnapshot.docs) {
-      final item = MonthlyPlanItem.fromDocument(itemDoc);
-      final confirmedDate = item.confirmedDate;
-      if (item.isCancelled || confirmedDate == null) {
-        continue;
+      for (final monthKey in monthKeys) {
+        Query<Map<String, dynamic>> monthQuery = _firestore
+            .collection('monthly_plans')
+            .doc(monthKey)
+            .collection('items')
+            .where('status', isEqualTo: 'sent')
+            .where('agendaStatus', isEqualTo: 'confirmed')
+            .where('auditorRef', isEqualTo: auditorRef);
+        if (companyRef != null) {
+          monthQuery = monthQuery.where('companyRef', isEqualTo: companyRef);
+        }
+
+        QuerySnapshot<Map<String, dynamic>> monthSnapshot;
+        try {
+          monthSnapshot = await monthQuery.get();
+        } catch (error) {
+          throw StateError(
+            'Falha ao consultar items confirmados em atraso no mês $monthKey: $error',
+          );
+        }
+
+        for (final itemDoc in monthSnapshot.docs) {
+          final item = MonthlyPlanItem.fromDocument(itemDoc);
+          final confirmedDate = item.confirmedDate;
+          if (item.isCancelled || confirmedDate == null) {
+            continue;
+          }
+          if (!confirmedDate.isBefore(threshold)) {
+            continue;
+          }
+
+          final clientPath = item.clientRef.path;
+          if (!auditDatesCache.containsKey(clientPath)) {
+            try {
+              auditDatesCache[clientPath] = await _loadAuditStartedDates(
+                item.clientRef,
+                auditorRef: auditorRef,
+              );
+            } catch (error) {
+              throw StateError(
+                'Falha ao consultar audits iniciadas para ${item.clientName} (${item.clientRef.path}): $error',
+              );
+            }
+          }
+          final startedDates = auditDatesCache[clientPath]!;
+
+          final hasAuditAfterConfirmation = startedDates.any(
+            (startedAt) => !startedAt.isBefore(confirmedDate),
+          );
+          if (!hasAuditAfterConfirmation) {
+            DocumentSnapshot<Object?> clientSnapshot;
+            try {
+              clientSnapshot = await item.clientRef.get();
+            } catch (error) {
+              throw StateError(
+                'Falha ao ler clientRef para ${item.clientName} (${item.clientRef.path}): $error',
+              );
+            }
+            final clientData = clientSnapshot.data() as Map<String, dynamic>?;
+            final address = ((clientData?['address'] as String?) ?? '').trim();
+            entries.add(
+              ConfirmedAgendaEntry(
+                item: item,
+                clientAddress: address.isEmpty ? 'Endereço não informado' : address,
+              ),
+            );
+          }
+        }
       }
-      if (!confirmedDate.isBefore(threshold)) {
-        continue;
+    } else {
+      Query<Map<String, dynamic>> itemsQuery = _firestore
+          .collectionGroup('items')
+          .where('agendaStatus', isEqualTo: 'confirmed');
+      if (companyRef != null) {
+        itemsQuery = itemsQuery.where('companyRef', isEqualTo: companyRef);
+      }
+      QuerySnapshot<Map<String, dynamic>> itemsSnapshot;
+      try {
+        itemsSnapshot = await itemsQuery.get();
+      } catch (error) {
+        throw StateError('Falha ao consultar items confirmados em atraso: $error');
       }
 
-      final clientPath = item.clientRef.path;
-      if (!auditDatesCache.containsKey(clientPath)) {
-        auditDatesCache[clientPath] = await _loadAuditStartedDates(item.clientRef);
-      }
-      final startedDates = auditDatesCache[clientPath]!;
+      for (final itemDoc in itemsSnapshot.docs) {
+        final item = MonthlyPlanItem.fromDocument(itemDoc);
+        final confirmedDate = item.confirmedDate;
+        if (item.isCancelled || confirmedDate == null) {
+          continue;
+        }
+        if (!confirmedDate.isBefore(threshold)) {
+          continue;
+        }
 
-      final hasAuditAfterConfirmation = startedDates.any(
-        (startedAt) => !startedAt.isBefore(confirmedDate),
-      );
-      if (!hasAuditAfterConfirmation) {
-        final clientSnapshot = await item.clientRef.get();
-        final clientData = clientSnapshot.data() as Map<String, dynamic>?;
-        final address = ((clientData?['address'] as String?) ?? '').trim();
-        entries.add(
-          ConfirmedAgendaEntry(
-            item: item,
-            clientAddress: address.isEmpty ? 'Endereço não informado' : address,
-          ),
+        final clientPath = item.clientRef.path;
+        if (!auditDatesCache.containsKey(clientPath)) {
+          try {
+            auditDatesCache[clientPath] = await _loadAuditStartedDates(
+              item.clientRef,
+            );
+          } catch (error) {
+            throw StateError(
+              'Falha ao consultar audits iniciadas para ${item.clientName} (${item.clientRef.path}): $error',
+            );
+          }
+        }
+        final startedDates = auditDatesCache[clientPath]!;
+
+        final hasAuditAfterConfirmation = startedDates.any(
+          (startedAt) => !startedAt.isBefore(confirmedDate),
         );
+        if (!hasAuditAfterConfirmation) {
+          DocumentSnapshot<Object?> clientSnapshot;
+          try {
+            clientSnapshot = await item.clientRef.get();
+          } catch (error) {
+            throw StateError(
+              'Falha ao ler clientRef para ${item.clientName} (${item.clientRef.path}): $error',
+            );
+          }
+          final clientData = clientSnapshot.data() as Map<String, dynamic>?;
+          final address = ((clientData?['address'] as String?) ?? '').trim();
+          entries.add(
+            ConfirmedAgendaEntry(
+              item: item,
+              clientAddress: address.isEmpty ? 'Endereço não informado' : address,
+            ),
+          );
+        }
       }
     }
 
@@ -607,11 +708,17 @@ class MonthlyPlanningService {
     return entries;
   }
 
-  Future<List<DateTime>> _loadAuditStartedDates(DocumentReference clientRef) async {
-    final snapshot = await _firestore
+  Future<List<DateTime>> _loadAuditStartedDates(
+    DocumentReference clientRef, {
+    DocumentReference? auditorRef,
+  }) async {
+    Query<Map<String, dynamic>> query = _firestore
         .collection('audits')
-        .where('clientRef', isEqualTo: clientRef)
-        .get();
+        .where('clientRef', isEqualTo: clientRef);
+    if (auditorRef != null) {
+      query = query.where('auditorRef', isEqualTo: auditorRef);
+    }
+    final snapshot = await query.get();
 
     final dates = <DateTime>[];
     for (final doc in snapshot.docs) {
