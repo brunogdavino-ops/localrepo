@@ -23,19 +23,23 @@ class AuthService {
   String _mapAuthException(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
-        return 'Usuario nao encontrado.';
       case 'wrong-password':
-        return 'Senha incorreta.';
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Usuario ou senha incorretos.';
       case 'invalid-email':
         return 'E-mail invalido.';
       case 'user-disabled':
         return 'Usuario desativado.';
+      case 'operation-not-allowed':
+        return 'Login por e-mail e senha nao esta habilitado no Firebase.';
       case 'too-many-requests':
         return 'Muitas tentativas. Tente novamente mais tarde.';
       case 'network-request-failed':
         return 'Erro de conexao. Verifique sua internet.';
       default:
-        return 'Erro ao fazer login. Tente novamente.';
+        return 'Erro ao fazer login (' + e.code + '). Tente novamente.';
     }
   }
 }
+
