@@ -813,6 +813,7 @@ class MonthlyPlanningService {
       case 'Mensal':
         return _addMonths(lastAuditDate, 1);
       case 'Bimensal':
+      case 'Bimestral':
         return _addMonths(lastAuditDate, 2);
       case 'Trimestral':
         return _addMonths(lastAuditDate, 3);
