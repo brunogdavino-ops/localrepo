@@ -891,11 +891,11 @@ export const generateAuditPdf = onCall(
                         )
                       ].join('');
                 return `<article class="nonconform">
-                  <div class="nonconform-header">Categoria: ${escapeHtml(item.categoryName)} - Questão ${item.order}</div>
+                  <div class="nonconform-header">Categoria: ${escapeHtml(item.categoryName)}</div>
                   <div class="nonconform-grid">
                     <div class="nonconform-item full">
                       <div class="meta-label">Descrição da pergunta</div>
-                      <div class="meta-value">${escapeHtml(item.questionText)}</div>
+                      <div class="meta-value"><span class="question-order">${item.order}</span> - ${escapeHtml(item.questionText)}</div>
                     </div>
                     <div class="nonconform-item">
                       <div class="meta-label">Responsável</div>

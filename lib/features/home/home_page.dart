@@ -15,6 +15,16 @@ import '../planning/planning_management_page.dart';
 import '../planning/monthly_planning_page.dart';
 import '../planning/services/monthly_planning_service.dart';
 
+String? _firebaseErrorCode(Object error) {
+  if (error is FirebaseException) return error.code;
+  try {
+    final dynamic code = (error as dynamic).code;
+    return code?.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -109,8 +119,8 @@ class _HomePageState extends State<HomePage> {
       final userSnapshot = await _firestore.collection('users').doc(user.uid).get();
       userData = userSnapshot.data();
       companyRef = userData?['companyref'] as DocumentReference?;
-    } on FirebaseException catch (error) {
-      if (error.code != 'permission-denied') {
+    } catch (error) {
+      if (_firebaseErrorCode(error) != 'permission-denied') {
         rethrow;
       }
       // Keep the admin home usable even when users/{uid} is temporarily

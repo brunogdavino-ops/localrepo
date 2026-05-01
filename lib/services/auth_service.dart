@@ -3,6 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
+  String? _firebaseErrorCode(Object error) {
+    if (error is FirebaseAuthException) return error.code;
+    if (error is FirebaseException) return error.code;
+    try {
+      final dynamic code = (error as dynamic).code;
+      return code?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<User?> signIn({
     required String email,
     required String password,
@@ -13,15 +24,17 @@ class AuthService {
         password: password,
       );
       return credential.user;
-    } on FirebaseAuthException catch (e) {
-      throw _mapAuthException(e);
-    } catch (_) {
+    } catch (error) {
+      final code = _firebaseErrorCode(error);
+      if (code != null) {
+        throw _mapAuthErrorCode(code);
+      }
       throw 'Erro inesperado. Tente novamente.';
     }
   }
 
-  String _mapAuthException(FirebaseAuthException e) {
-    switch (e.code) {
+  String _mapAuthErrorCode(String code) {
+    switch (code) {
       case 'user-not-found':
       case 'wrong-password':
       case 'invalid-credential':
@@ -38,7 +51,7 @@ class AuthService {
       case 'network-request-failed':
         return 'Erro de conexao. Verifique sua internet.';
       default:
-        return 'Erro ao fazer login (' + e.code + '). Tente novamente.';
+        return 'Erro ao fazer login (' + code + '). Tente novamente.';
     }
   }
 }
