@@ -6,6 +6,16 @@ import '../auth/login_page.dart';
 import 'auditor_home_page.dart';
 import 'home_page.dart';
 
+String? _firebaseErrorCode(Object error) {
+  if (error is FirebaseException) return error.code;
+  try {
+    final dynamic code = (error as dynamic).code;
+    return code?.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 class HomeEntryPage extends StatelessWidget {
   const HomeEntryPage({super.key});
 
@@ -15,9 +25,11 @@ class HomeEntryPage extends StatelessWidget {
     try {
       final snapshot = await firestore.collection('users').doc(user.uid).get();
       return (snapshot.data()?['role'] as String?)?.trim().toLowerCase();
-    } on FirebaseException catch (_) {
-      return null;
-    } catch (_) {
+    } catch (error) {
+      final code = _firebaseErrorCode(error);
+      if (code == null) {
+        return null;
+      }
       return null;
     }
   }

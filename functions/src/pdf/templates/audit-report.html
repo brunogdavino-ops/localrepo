@@ -128,16 +128,10 @@
     }
 
     .artezi-logo-top {
-      width: 94px;
+      width: 88px;
       height: auto;
       object-fit: contain;
       display: block;
-    }
-
-    .artezi-caption {
-      font-size: 11px;
-      line-height: 1.45;
-      color: #8f96a8;
     }
 
     .top-copy {
@@ -158,9 +152,9 @@
     }
 
     .title {
-      font-size: 14px;
-      line-height: 1.04;
-      letter-spacing: 0.14em;
+      font-size: 12px;
+      line-height: 1.18;
+      letter-spacing: 0.1em;
       font-weight: 700;
       text-transform: uppercase;
       color: #7c84a0;
@@ -478,6 +472,20 @@
       color: #656e8d;
     }
 
+    .nonconform .meta-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .nonconform .question-order {
+      color: var(--brand);
+      font-weight: 600;
+    }
+
     .photos {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -697,11 +705,11 @@
     }
 
     .footer-brand-artezi {
-      width: 124px;
+      width: 136px;
       height: auto;
       object-fit: contain;
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 0;
     }
 
     .footer-brand-atac {
@@ -738,12 +746,11 @@
       <header class="topbar">
         <div class="brand-lockup">
           <div class="artezi-brand">
-            <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Artezi" class="artezi-logo-top" />
-            <div class="artezi-caption">Auditoria realizada por Artezi</div>
+            <img src="{{CLIENT_LOGO_DATA_URI}}" alt="ATAC" class="artezi-logo-top" />
           </div>
         </div>
         <div class="top-copy">
-          <div class="title">Relatório técnico de auditoria sanitária</div>
+          <div class="title">Relatório técnico da auditoria de qualidade</div>
         </div>
       </header>
 
@@ -753,7 +760,7 @@
             <div class="hero-title-block">
               <div class="section-kicker">Resumo da auditoria</div>
               <div class="client-name">{{CLIENT_NAME}}</div>
-              <div class="hero-subtitle">Auditoria sanitária realizada em {{AUDIT_DATE}}</div>
+              <div class="hero-subtitle">Auditoria realizada em {{AUDIT_DATE}}</div>
             </div>
           </div>
 
@@ -770,7 +777,7 @@
               </div>
 
               <div class="info-item">
-                <div class="info-label">Auditor responsável</div>
+                <div class="info-label">Auditor(a) responsável</div>
                 <div class="info-value">{{AUDITOR_NAME}}</div>
               </div>
 
@@ -809,6 +816,10 @@
       <section class="section">
         <div class="section-head">
           <div class="section-subtitle">2. Desempenho da auditoria</div>
+        </div>
+
+        <div class="text">
+          Obs: Índice atingido pelo cliente e operadora em 100% de suas respectivas responsabilidades.
         </div>
 
         <div class="performance-wrap">
@@ -861,8 +872,6 @@
           <div class="conclusion">
             Com base na avaliação realizada, a unidade apresentou classificação <strong>{{OVERALL_CLASSIFICATION}} ({{OVERALL_SCORE}}%)</strong>, sendo recomendadas ações corretivas prioritárias nos itens identificados como não conformes.
             <br /><br />
-            Recomenda-se acompanhamento técnico e reavaliação no próximo ciclo de auditoria.
-            <br /><br />
             <strong>Referência normativa:</strong> Resolução RDC nº 216, de 15 de setembro de 2004 - ANVISA - Regulamento Técnico de Boas Práticas para Serviços de Alimentação.
           </div>
         </section>
@@ -873,9 +882,6 @@
             <div class="footer-separator"></div>
             <div class="footer-brand-block">
               <img src="{{FOOTER_LOGO_DATA_URI}}" alt="Artezi" class="footer-brand-artezi" />
-              <div class="footer-name">Claudia Artezi</div>
-              <div class="footer-meta">Responsável Técnica</div>
-              <div class="footer-meta">São Paulo - SP</div>
             </div>
           </div>
           <div class="footer-legal">

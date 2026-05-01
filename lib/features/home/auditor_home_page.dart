@@ -12,6 +12,16 @@ import '../planning/auditor_agenda_page.dart';
 import '../planning/models/monthly_plan_item.dart';
 import '../planning/services/monthly_planning_service.dart';
 
+String? _firebaseErrorCode(Object error) {
+  if (error is FirebaseException) return error.code;
+  try {
+    final dynamic code = (error as dynamic).code;
+    return code?.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 class AuditorHomePage extends StatefulWidget {
   const AuditorHomePage({super.key});
 
@@ -91,8 +101,8 @@ class _AuditorHomePageState extends State<AuditorHomePage> {
     try {
       final userSnapshot = await _firestore.collection('users').doc(user.uid).get();
       userData = userSnapshot.data();
-    } on FirebaseException catch (error) {
-      if (error.code != 'permission-denied') {
+    } catch (error) {
+      if (_firebaseErrorCode(error) != 'permission-denied') {
         rethrow;
       }
       // Keep the auditor home usable even when users/{uid} is blocked by

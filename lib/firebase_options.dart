@@ -4,9 +4,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -39,6 +37,15 @@ class DefaultFirebaseOptions {
     appId: '1:309238860637:android:f5fc1fab0d8a59bfedb6b4',
     messagingSenderId: '309238860637',
     projectId: 'auditapp-94b97',
+    storageBucket: 'auditapp-94b97.firebasestorage.app',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDtLQ_oIkiWjbnO4UYgl_adulyV0lg8zF4',
+    appId: '1:309238860637:web:6c76e81efed98232edb6b4',
+    messagingSenderId: '309238860637',
+    projectId: 'auditapp-94b97',
+    authDomain: 'auditapp-94b97.firebaseapp.com',
     storageBucket: 'auditapp-94b97.firebasestorage.app',
   );
 }
