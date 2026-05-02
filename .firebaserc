@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "auditapp-94b97"
-  }
+  },
+  "targets": {
+    "auditapp-94b97": {
+      "hosting": {
+        "webapp": [
+          "artezi-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

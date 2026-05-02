@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -474,7 +475,9 @@ class _AuditFillPageState extends State<AuditFillPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.message.toString())),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('AuditFillPage: upload de foto falhou: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -494,23 +497,34 @@ class _AuditFillPageState extends State<AuditFillPage> {
       throw StateError('Arquivo de foto vazio.');
     }
 
-    final optimizedBytes = await FlutterImageCompress.compressWithList(
-      originalBytes,
-      minWidth: _photoUploadMaxDimension,
-      minHeight: _photoUploadMaxDimension,
-      quality: _photoUploadQuality,
-      format: CompressFormat.jpeg,
-      autoCorrectionAngle: true,
-      keepExif: false,
-    );
-
-    if (optimizedBytes.isEmpty) {
-      throw StateError(
-        'Nao foi possivel otimizar a foto antes do upload. Tente novamente.',
+    try {
+      final optimizedBytes = await FlutterImageCompress.compressWithList(
+        originalBytes,
+        minWidth: _photoUploadMaxDimension,
+        minHeight: _photoUploadMaxDimension,
+        quality: _photoUploadQuality,
+        format: CompressFormat.jpeg,
+        autoCorrectionAngle: true,
+        keepExif: false,
       );
-    }
 
-    return optimizedBytes;
+      if (optimizedBytes.isEmpty) {
+        throw StateError(
+          'Nao foi possivel otimizar a foto antes do upload. Tente novamente.',
+        );
+      }
+
+      return optimizedBytes;
+    } catch (error, stackTrace) {
+      if (kIsWeb) {
+        debugPrint(
+          'AuditFillPage: compressao web falhou, usando bytes originais: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+        return originalBytes;
+      }
+      rethrow;
+    }
   }
 
   Future<void> _deletePhoto({
