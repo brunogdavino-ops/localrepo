@@ -15,13 +15,13 @@ String? _firebaseErrorCode(Object error) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Avoid duplicate initialize errors when the native SDK is already initialized.
+  // On web release builds, querying Firebase.apps before initialization can
+  // itself fail depending on the interop/runtime state. Prefer trying a single
+  // initialization and only swallowing duplicate-app races.
   try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (error) {
     final code = _firebaseErrorCode(error);
     if (code != 'duplicate-app') rethrow;
