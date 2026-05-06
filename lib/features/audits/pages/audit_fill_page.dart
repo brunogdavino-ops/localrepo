@@ -398,6 +398,12 @@ class _AuditFillPageState extends State<AuditFillPage> {
     return (_photoUploadingByQuestion[questionId] ?? false) ? 1 : 0;
   }
 
+  Future<int> _remainingPhotoSlots(String questionId) async {
+    final savedPhotos = await _countSavedPhotos(questionId);
+    final remaining = _maxPhotosPerQuestion - savedPhotos;
+    return remaining < 0 ? 0 : remaining;
+  }
+
   Future<bool> _canAddMorePhotos(String questionId) async {
     final savedPhotos = await _countSavedPhotos(questionId);
     return savedPhotos + _inFlightPhotoCount(questionId) < _maxPhotosPerQuestion;
@@ -406,6 +412,35 @@ class _AuditFillPageState extends State<AuditFillPage> {
   Future<bool> _hasReachedSavedPhotoLimit(String questionId) async {
     final savedPhotos = await _countSavedPhotos(questionId);
     return savedPhotos >= _maxPhotosPerQuestion;
+  }
+
+  Future<void> _uploadPhotoFile({
+    required DocumentReference<Map<String, dynamic>> answerRef,
+    required XFile picked,
+  }) async {
+    final photoDoc = answerRef.collection('photos').doc();
+    final filePath =
+        'audit_photos/${widget.auditId}/${answerRef.id}/${photoDoc.id}.jpg';
+    final storageRef = _storage.ref().child(filePath);
+    final bytes = await _optimizePhotoForUpload(picked);
+    if (bytes.isEmpty) {
+      throw StateError('Arquivo de foto vazio.');
+    }
+
+    await storageRef.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+    final url = await storageRef.getDownloadURL();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    await photoDoc.set({
+      'url': url,
+      'path': filePath,
+      'createdAt': FieldValue.serverTimestamp(),
+      'createdBy': uid ?? '',
+      'fileName': picked.name,
+    });
   }
 
   Future<void> _handleAddPhoto(String questionId) async {
@@ -432,44 +467,52 @@ class _AuditFillPageState extends State<AuditFillPage> {
       final source = await _pickImageSource();
       if (source == null) return;
 
-      final picked = await _imagePicker.pickImage(
-        source: source,
-        imageQuality: 85,
-      );
-      if (picked == null) return;
+      final remainingSlots = await _remainingPhotoSlots(questionId);
+      if (remainingSlots <= 0 || await _hasReachedSavedPhotoLimit(questionId)) {
+        throw StateError('Limite de 4 fotos por pergunta atingido.');
+      }
 
-      if (await _hasReachedSavedPhotoLimit(questionId)) {
+      final List<XFile> selectedFiles;
+      if (source == ImageSource.gallery) {
+        selectedFiles = await _imagePicker.pickMultiImage(imageQuality: 85);
+      } else {
+        final picked = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 85,
+        );
+        if (picked == null) return;
+        selectedFiles = [picked];
+      }
+
+      if (selectedFiles.isEmpty) return;
+
+      final truncatedSelection = selectedFiles.length > remainingSlots;
+      final filesToUpload = selectedFiles.take(remainingSlots).toList();
+      if (filesToUpload.isEmpty) {
         throw StateError('Limite de 4 fotos por pergunta atingido.');
       }
 
       final answerRef = await _ensureAnswerRef(questionId);
-      final photoDoc = answerRef.collection('photos').doc();
-      final filePath =
-          'audit_photos/${widget.auditId}/${answerRef.id}/${photoDoc.id}.jpg';
-      final storageRef = _storage.ref().child(filePath);
-      final bytes = await _optimizePhotoForUpload(picked);
-      if (bytes.isEmpty) {
-        throw StateError('Arquivo de foto vazio.');
+      for (final picked in filesToUpload) {
+        await _uploadPhotoFile(answerRef: answerRef, picked: picked);
       }
-
-      await storageRef.putData(
-        bytes,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-      final url = await storageRef.getDownloadURL();
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-
-      await photoDoc.set({
-        'url': url,
-        'path': filePath,
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': uid ?? '',
-        'fileName': picked.name,
-      });
 
       await _firestore.collection('audits').doc(widget.auditId).update({
         'updated_at': FieldValue.serverTimestamp(),
       });
+
+      if (!mounted) return;
+      if (truncatedSelection) {
+        final addedCount = filesToUpload.length;
+        final photoLabel = addedCount == 1 ? 'foto' : 'fotos';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'So foi possivel adicionar $addedCount $photoLabel para respeitar o limite de 4 por pergunta.',
+            ),
+          ),
+        );
+      }
     } on StateError catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
