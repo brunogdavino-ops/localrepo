@@ -102,10 +102,25 @@ class _NewAuditPageState extends State<NewAuditPage> {
 
   void _onClientFocusChanged() {
     if (!_clientFocusNode.hasFocus && mounted) {
-      setState(() {
-        _clientResults = const [];
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        if (!mounted || _clientFocusNode.hasFocus || _selectedClientRef != null) {
+          return;
+        }
+        setState(() {
+          _clientResults = const [];
+        });
       });
     }
+  }
+
+  void _selectClient(_ClientOption client) {
+    setState(() {
+      _selectedClientRef = client.ref;
+      _selectedClientName = client.name;
+      _clientSearchController.text = client.name;
+      _clientResults = const [];
+    });
+    _clientFocusNode.unfocus();
   }
 
   Future<void> _searchClients(String query) async {
@@ -578,22 +593,15 @@ class _NewAuditPageState extends State<NewAuditPage> {
                                     ),
                                   ],
                                 ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(20),
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedClientRef = client.ref;
-                                        _selectedClientName = client.name;
-                                        _clientSearchController.text = client.name;
-                                        _clientResults = const [];
-                                      });
-                                      _clientFocusNode.unfocus();
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
+                                 child: Material(
+                                   color: Colors.transparent,
+                                   child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTapDown: (_) => _selectClient(client),
+                                      onTap: () => _selectClient(client),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
                                         vertical: 18,
                                       ),
                                       child: Text(
